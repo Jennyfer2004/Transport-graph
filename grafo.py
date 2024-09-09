@@ -5,11 +5,11 @@ import random
 import time
 import math
 
-def create_transport_graph(rows, cols):
+def create_transport_graph(rows, cols,calle,ave):
     G = nx.grid_2d_graph(rows, cols)
     
     # Agregar desviaciones aleatorias a las posiciones de los nodos
-    pos = {(x, y): (x + random.uniform(-0.5, 0.5), y + random.uniform(-0.5, 0.5)) for x, y in G.nodes()}
+    pos = {(x, y): (x + random.uniform(-calle, calle), y + random.uniform(-ave, ave)) for x, y in G.nodes()}
 
     # Definir pesos y grosores por fila y columna
     weights = [2, 4, 6, 8]  # Pesos disponibles
@@ -155,89 +155,101 @@ def main():
 
     st.title("Red de Transporte ")
     st.sidebar.header("Configuración de la Red")
+    calle = st.sidebar.select_slider(
+        "Selecciona el grado de desviación que van a tener las calles",
+        options=[0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]
+    )    
+    ave = st.sidebar.select_slider(
+        "Selecciona el grado de desviación que van a tener las avenidas",
+        options=[0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]
+    )
     rows = st.sidebar.number_input("Número de Filas", min_value=1, value=5)
     cols = st.sidebar.number_input("Número de Columnas", min_value=1, value=5)
     num_objects = st.sidebar.number_input("Cantidad de Objetos en Movimiento", min_value=1, value=3)
-    if "graph" not in st.session_state or st.session_state.rows != rows or st.session_state.cols != cols:
+    if ave and calle:
+
+        if "graph" not in st.session_state or st.session_state.rows != rows or st.session_state.cols != cols:
         # Crear el grafo de la red de transporte
-        G, pos, edge_weights, edge_thickness = create_transport_graph(rows, cols)
-        st.session_state.graph = G
-        st.session_state.pos = pos
-        st.session_state.edge_weights = edge_weights
-        st.session_state.edge_thickness = edge_thickness
-        st.session_state.rows = rows
-        st.session_state.cols = cols
-    else:
-        G = st.session_state.graph
-        pos = st.session_state.pos
-        edge_weights = st.session_state.edge_weights
-        edge_thickness = st.session_state.edge_thickness
         
-    agree = st.sidebar.checkbox("Dimensiones de los carriles")
-    if agree:
-        total_col = {}
-        total_fil = {}
-
-        for edge, weight in edge_weights.items():
-            x0, y0 = edge[0]
-            x1, y1 = edge[1]
-            if x0 == x1:
-                fil = x1  
-                if fil not in total_fil:
-                    total_fil[fil] = weight
-            elif y0 == y1:
-                col = y0  # Determinar la columna basada en la posición de las aristas
-                if col not in total_col:
-                    total_col[col] = weight
+            G, pos, edge_weights, edge_thickness = create_transport_graph(rows, cols,calle,ave)
+            st.session_state.graph = G
+            st.session_state.pos = pos
+            st.session_state.edge_weights = edge_weights
+            st.session_state.edge_thickness = edge_thickness
+            st.session_state.rows = rows
+            st.session_state.cols = cols
+        else:
+            G = st.session_state.graph
+            pos = st.session_state.pos
+            edge_weights = st.session_state.edge_weights
+            edge_thickness = st.session_state.edge_thickness
         
-        fil = st.sidebar.checkbox("Dimensiones de las avenidas")
-        if fil:
-            st.sidebar.subheader("Pesos Totales por Columna")
-            for col, total_weight in total_col.items():
-                st.sidebar.write(f"Total de carriles de la avenida {col}: {total_weight}")
+        agree = st.sidebar.checkbox("Dimensiones de los carriles")
+    
+        if agree:
+            total_col = {}
+            total_fil = {}
 
-        col = st.sidebar.checkbox("Dimensiones de las calles")
-        if col:
-            st.sidebar.subheader("Pesos Totales por Fila")
-            for fil, total_weight in total_fil.items():
-                st.sidebar.write(f"Total de carriles de la calle {fil}: {total_weight}")
+            for edge, weight in edge_weights.items():
+                x0, y0 = edge[0]
+                x1, y1 = edge[1]
+                if x0 == x1:
+                    fil = x1  
+                    if fil not in total_fil:
+                        total_fil[fil] = weight
+                elif y0 == y1:
+                    col = y0  # Determinar la columna basada en la posición de las aristas
+                    if col not in total_col:
+                        total_col[col] = weight
+        
+            fil = st.sidebar.checkbox("Dimensiones de las avenidas")
+            if fil:
+                st.sidebar.subheader("Pesos Totales por Columna")
+                for col, total_weight in total_col.items():
+                    st.sidebar.write(f"Total de carriles de la avenida {col}: {total_weight}")
+
+            col = st.sidebar.checkbox("Dimensiones de las calles")
+            if col:
+                st.sidebar.subheader("Pesos Totales por Fila")
+                for fil, total_weight in total_fil.items():
+                    st.sidebar.write(f"Total de carriles de la calle {fil}: {total_weight}")
 
     # Opción para eliminar aristas
-    st.sidebar.subheader("Eliminar Aristas")
-    edges = list(G.edges())
-    selected_edge = st.sidebar.selectbox("Selecciona una arista para eliminar:", edges, format_func=lambda e: f"{e[0]}-{e[1]}")
+        st.sidebar.subheader("Eliminar Aristas")
+        edges = list(G.edges())
+        selected_edge = st.sidebar.selectbox("Selecciona una arista para eliminar:", edges, format_func=lambda e: f"{e[0]}-{e[1]}")
     
-    if st.sidebar.button("Eliminar Arista"):
-        if selected_edge in G.edges():
-            G.remove_edge(*selected_edge)
-            edge_weights.pop(selected_edge, None)
-            edge_thickness.pop(selected_edge, None)
-        else:
-            st.error(f"Arista {selected_edge} no encontrada")
+        if st.sidebar.button("Eliminar Arista"):
+            if selected_edge in G.edges():
+                G.remove_edge(*selected_edge)
+                edge_weights.pop(selected_edge, None)
+                edge_thickness.pop(selected_edge, None)
+            else:
+                st.error(f"Arista {selected_edge} no encontrada")
     # Opción para eliminar aristas
-    st.sidebar.subheader("Eliminar Nodos")
-    nodes = list(G.nodes())
-    selected_node = st.sidebar.selectbox("Selecciona una arista para eliminar:", nodes)
-    
-    if st.sidebar.button("Eliminar Nodos"):
-        if selected_node in G.nodes():
-            G.remove_node(selected_node)
-            edges_to_eliminate=list(G.edges(selected_node))
-            for edge in edges_to_eliminate:
-                edge_weights.pop(edge, None)
-                edge_thickness.pop(edge, None)
-            pos={node:pos[node] for node in G.nodes()}
-            st.session_state.pos=pos
-        else:
-            st.error(f"Nodo {selected_node} no encontrado")
+        st.sidebar.subheader("Eliminar Nodos")
+        nodes = list(G.nodes())
+        selected_node = st.sidebar.selectbox("Selecciona una arista para eliminar:", nodes)
+
+        if st.sidebar.button("Eliminar Nodos"):
+            if selected_node in G.nodes():
+                G.remove_node(selected_node)
+                edges_to_eliminate=list(G.edges(selected_node))
+                for edge in edges_to_eliminate:
+                    edge_weights.pop(edge, None)
+                    edge_thickness.pop(edge, None)
+                pos={node:pos[node] for node in G.nodes()}
+                st.session_state.pos=pos
+            else:
+                st.error(f"Nodo {selected_node} no encontrado")
 
     # Inicializar las posiciones de los objetos en movimiento en aristas aleatorias
-    moving_objects = {}
-    for i in range(num_objects):
-        edge = random.choice(list(G.edges()))
-        if edge not in moving_objects:
-            moving_objects[edge] = []
-        moving_objects[edge].append({
+        moving_objects = {}
+        for i in range(num_objects):
+            edge = random.choice(list(G.edges()))
+            if edge not in moving_objects:
+               moving_objects[edge] = []
+            moving_objects[edge].append({
             'id': i,
             'pos': [(pos[edge[0]][0] + pos[edge[1]][0]) / 2, 
                     (pos[edge[0]][1] + pos[edge[1]][1]) / 2],
@@ -247,35 +259,36 @@ def main():
         })
 
     # Dibujar el grafo con los objetos en movimiento
-    fig = draw_graph(G, pos, edge_weights, edge_thickness, moving_objects)
-    graph_placeholder = st.empty()
-    graph_placeholder.plotly_chart(fig)
-
-    # Animar los objetos en movimiento
-    while True:
-        new_moving_objects = {}
-        for edge, objects_on_edge in moving_objects.items():
-            for obj in objects_on_edge:
-                # Moverse a una arista adyacente aleatoria
-                closest_edge = get_random_closest_edge(pos, obj['current_edge'][1], obj['previous_node'])
-                if closest_edge is None:
-                    continue
-
-                obj['previous_node'] = obj['current_edge'][1]
-                obj['current_edge'] = closest_edge
-
-                if closest_edge not in new_moving_objects:
-                    new_moving_objects[closest_edge] = []
-                new_moving_objects[closest_edge].append(obj)
-
-        moving_objects = new_moving_objects
-
-        # Actualizar el grafo
         fig = draw_graph(G, pos, edge_weights, edge_thickness, moving_objects)
+        graph_placeholder = st.empty()
         graph_placeholder.plotly_chart(fig)
 
+    # Animar los objetos en movimiento
+        while True:
+            new_moving_objects = {}
+            for edge, objects_on_edge in moving_objects.items():
+                for obj in objects_on_edge:
+                # Moverse a una arista adyacente aleatoria
+                    closest_edge = get_random_closest_edge(pos, obj['current_edge'][1], obj['previous_node'])
+                    if closest_edge is None:
+                        continue
+
+                    obj['previous_node'] = obj['current_edge'][1]
+                    obj['current_edge'] = closest_edge
+
+                    if closest_edge not in new_moving_objects:
+                        new_moving_objects[closest_edge] = []
+                    new_moving_objects[closest_edge].append(obj)
+
+            moving_objects = new_moving_objects
+
+        # Actualizar el grafo
+            fig = draw_graph(G, pos, edge_weights, edge_thickness, moving_objects)
+            graph_placeholder.plotly_chart(fig)
+
         # Esperar un momento antes de la siguiente actualización
-        time.sleep(2)
-    
+            time.sleep(2)
+    else:
+        st.write("Seleccione la desviación de los carriles")
 if __name__ == "__main__":
     main()
