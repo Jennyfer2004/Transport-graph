@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import random
 import time
 import math
+import matplotlib.colors as mcolors
 
 def create_transport_graph(rows, cols):
     G = nx.grid_2d_graph(rows, cols)
@@ -50,6 +51,7 @@ def create_transport_graph(rows, cols):
 
     return G, pos, edge_weights, edge_thickness
 
+
 def draw_graph(G, pos, edge_weights, edge_thickness, moving_objects,centrality_value=None):
     edge_traces = []
     for edge in G.edges():
@@ -79,9 +81,12 @@ def draw_graph(G, pos, edge_weights, edge_thickness, moving_objects,centrality_v
             node_x.append(x)
             node_y.append(y)
             text.append(str(node))
-            centrality=centrality_value[node]
-            node_color.append(centrality-min_centrality)/(max_centrality-min_centrality)
-            print(node_color)
+            centrality =centrality_value[node]
+            if centrality-min_centrality==0:
+                node_color.append(0)
+            else:
+                node_color.append((centrality-min_centrality)/(max_centrality-min_centrality))
+            #print(node_color)
             node_size.append(centrality*50)
     else:
         for node in G.nodes():
@@ -176,26 +181,12 @@ def calculate_centrality(G,nombre):
     elif nombre=="Eigenvector Centrality": 
         return nx.eigenvector_centrality(G)
     elif nombre=="Minimo Cenected Time":
-       n = G.number_of_nodes()
-       degree_sequence = sorted([len(list(G.neighbors(node))) for node in G.nodes()], reverse=True)
-       
-       connection_times = []
-       for i in range(n):
-           time = 0
-           visited = set()
-           queue = [degree_sequence[i]]
-           while queue:
-               current_degree = queue.pop(0)
-               if len(visited) == n:
-                   break
-               for neighbor in G.neighbors(next(iter(visited))):
-                   if neighbor not in visited:
-                       visited.add(neighbor)
-                       if len(G.neighbors(neighbor)) < current_degree:
-                           queue.append(len(G.neighbors(neighbor)))
-                       else:
-                           time += 1
-       return time
+        conection_times={}
+        for node in G.nodes():
+           lengths=nx.single_source_shortest_path_length(G,node)
+           total_time=sum(lengths.values())
+           conection_times[node]=0.3-(total_time/1000)
+        return conection_times
 def main():
     global G
 
@@ -205,7 +196,7 @@ def main():
     rows = st.sidebar.number_input("Número de Filas", min_value=1, value=5)
     cols = st.sidebar.number_input("Número de Columnas", min_value=1, value=5)
     num_objects = st.sidebar.number_input("Cantidad de Objetos en Movimiento", min_value=1, value=3)
-
+    
     if "graph" not in st.session_state or st.session_state.rows != rows or st.session_state.cols != cols:
         G, pos, edge_weights, edge_thickness = create_transport_graph(rows, cols)
 
@@ -220,14 +211,18 @@ def main():
         pos = st.session_state.pos
         edge_weights = st.session_state.edge_weights
         edge_thickness = st.session_state.edge_thickness
+    centrality_option = st.sidebar.selectbox("Selecciona el tipo de centralidad:", ["Ninguna","Degree Centrality","Minimo Cenected Time","Betweenness Centrality","Closeness Centrality","Eigenvector Centrality"
+    ])
+    if centrality_option:
+        centrality_value =calculate_centrality(G,centrality_option)
+    elif centrality_option!="Ninguna":
+        centrality_value =None
     # Opción para eliminar aristas
     st.sidebar.subheader("Eliminar Aristas")
     edges = list(G.edges())
     selected_edge = st.sidebar.selectbox("Selecciona una arista para eliminar:", edges, format_func=lambda e: f"{e[0]}-{e[1]}")
     st.sidebar.subheader("Centralidad de los Nodos")
-    centrality_option = st.sidebar.selectbox("Selecciona el tipo de centralidad:", ["Degree Centrality","Closeness Centrality","Betweenness Centrality","Eigenvector Centrality","Minimo Cenected Time"
-    ])
-    centrality_value =calculate_centrality(G,centrality_option)
+    
     if st.sidebar.button("Eliminar Arista"):
         if selected_edge in G.edges():
             G.remove_edge(*selected_edge)
@@ -266,9 +261,9 @@ def main():
             'previous_node': edge[0],
             'color': 'red' if i == 0 else f'rgba({random.randint(0,255)}, {random.randint(0,255)}, {random.randint(0,255)}, 1)'
         })
-
+    
     # Dibujar el grafo con los objetos en movimiento
-    fig = draw_graph(G, pos, edge_weights, edge_thickness, centrality_value)
+    fig = draw_graph(G, pos, edge_weights, edge_thickness,moving_objects, centrality_value)
     graph_placeholder = st.empty()
     graph_placeholder.plotly_chart(fig)
 
@@ -292,7 +287,7 @@ def main():
         moving_objects = new_moving_objects
 
         # Actualizar el grafo
-        fig = draw_graph(G, pos, edge_weights, edge_thickness, moving_objects)
+        fig = draw_graph(G, pos, edge_weights, edge_thickness, moving_objects,centrality_value)
         graph_placeholder.plotly_chart(fig)
 
         # Esperar un momento antes de la siguiente actualización
