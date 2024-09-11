@@ -191,7 +191,7 @@ def get_random_closest_edge(pos, current_node, previous_node):
 def main():
         global G  
 
-        st.title("Red de Transporte ")
+        st.title("Explorando la Infraestructura Urbana")
         st.sidebar.header("Configuración de la Red")
         calle = st.sidebar.select_slider(
         "Selecciona el grado de desviación que van a tener las calles",
@@ -272,14 +272,14 @@ def main():
     # Opción para dimensiones de las avenidas
             fil = st.sidebar.checkbox("Dimensiones de las avenidas")
             if fil:
-                st.sidebar.subheader("Pesos Totales por Columna")
+                st.sidebar.subheader("Pesos Totales por Calle")
                 for col, total_weight in total_col.items():
                     st.sidebar.write(f"Total de carriles de la avenida {col}: {total_weight}")
 
     # Opción para dimensiones de las calles
             col = st.sidebar.checkbox("Dimensiones de las calles")
             if col:
-                st.sidebar.subheader("Pesos Totales por Fila")
+                st.sidebar.subheader("Pesos Totales por avenida")
                 for fil, total_weight in total_fil.items():
                     st.sidebar.write(f"Total de carriles de la calle {fil}: {total_weight}")
         else:
