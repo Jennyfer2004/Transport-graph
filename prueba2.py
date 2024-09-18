@@ -6,6 +6,33 @@ import random
 import plotly.graph_objects as go
 import time
 
+# Crear un grafo de cuadrícula y conectarlos con n aristas
+def create_connected_grid_graphs(rows1, cols1, rows2, cols2, num_edges):
+    G1 = nx.grid_2d_graph(rows1, cols1)  # Primer grafo de cuadrícula
+    G2 = nx.grid_2d_graph(rows2, cols2)  # Segundo grafo de cuadrícula
+
+    # Renombrar los nodos del segundo grafo para que no se solapen con el primero
+    max_col1 = max([node[1] for node in G1.nodes()])
+    mapping = {node: (node[0], node[1] + max_col1 + 2) for node in G2.nodes()}  # Desplazar el segundo grafo
+    G2 = nx.relabel_nodes(G2, mapping)
+
+    # Crear un grafo combinado
+    G = nx.compose(G1, G2)
+
+    # Conectar los grafos con n aristas
+    edges_added = 0
+    G1_nodes = [node for node in G1.nodes() if node[1] == cols1 - 1]  # Nodos del borde derecho de G1
+    G2_nodes = [node for node in G2.nodes() if node[1] == max_col1 + 2]  # Nodos del borde izquierdo de G2
+    
+    while edges_added < num_edges:
+        node1 = random.choice(G1_nodes)  # Seleccionar un nodo al azar del borde derecho de G1
+        node2 = random.choice(G2_nodes)  # Seleccionar un nodo al azar del borde izquierdo de G2
+        if not G.has_edge(node1, node2):  # Evitar aristas duplicadas
+            G.add_edge(node1, node2)
+            edges_added += 1
+
+    return G
+
 def draw_graph(G, pos, edge_weights, edge_thickness,centrality_value=None ,moving_objects=None):
     edge_traces = []
     for edge in G.edges():
@@ -182,7 +209,7 @@ def main():
 
     grafo_tipo = st.sidebar.selectbox(
     'Selecciona el tipo de grafo para la red de transporte:',
-    ['Erdos-Rényi', 'Barabási-Albert', 'Grid 2D Graph', 'Watts-Strogatz', 'Regular']
+    ['Erdos-Rényi', 'Barabási-Albert', 'Grid 2D Graph', 'Watts-Strogatz', 'Regular',"N- Gird 2D Graph"]
 )
 
     input_text = st.sidebar.text_area(
@@ -288,20 +315,29 @@ def main():
             edge_weights = st.session_state.edge_weights
             edge_thickness = st.session_state.edge_thickness
 
-    elif grafo_tipo == 'Regular':
-        n = st.sidebar.slider('Número de nodos', value=20)
-        k = st.sidebar.slider('Número de conexiones por nodo (k)', min_value=1, max_value=n//2, value=2)
-
-        if ("graph" not in st.session_state or st.session_state.numbers != numbers or st.session_state.n != n or st.session_state.k != k) and grafo_tipo == 'Regular' :
-            st.session_state.n = n
-            st.session_state.k = k
+    elif grafo_tipo == 'N- Gird 2D Graph':
+        rows1 = st.sidebar.slider("Filas del primer grafo", min_value=2, max_value=10, value=3)
+        cols1 = st.sidebar.slider("Columnas del primer grafo", min_value=2, max_value=10, value=3)
+    
+        rows2 = st.sidebar.slider("Filas del segundo grafo", min_value=2, max_value=10, value=3)
+        cols2 = st.sidebar.slider("Columnas del segundo grafo", min_value=2, max_value=10, value=3)
+    
+    # Número de aristas que conectan los grafos
+        num_edges = st.sidebar.slider("Número de aristas entre los grafos", min_value=1, max_value=10, value=1)
+    
+        if ("graph" not in st.session_state or st.session_state.num_edges != num_edges or st.session_state.rows1 != rows1 or st.session_state.rows2 != rows2 or st.session_state.cols2 != cols2 or st.session_state.cols1 != cols1) and grafo_tipo == 'Regular' :
+            st.session_state.rows1 = rows1
+            st.session_state.rows2 = rows2
+            st.session_state.cols1 = cols1
+            st.session_state.cols2 = cols2
+            st.session_state.num_edges = num_edges
             st.session_state.rows = 1
             st.session_state.cols = 1
             st.session_state.ave = 1
             st.session_state.calle = 1
             st.session_state.m = 1
             st.session_state.p = 1
-            G = nx.random_regular_graph(k, n)
+            G = create_connected_grid_graphs(rows1, cols1, rows2, cols2, num_edges)
             pos=nx.spring_layout(G)
             st.session_state.graph = G
             st.session_state.pos = pos
@@ -345,6 +381,35 @@ def main():
             edge_weights = st.session_state.edge_weights
             edge_thickness = st.session_state.edge_thickness
 
+    elif grafo_tipo == 'Regular':
+        n = st.sidebar.slider('Número de nodos', value=20)
+        k = st.sidebar.slider('Número de conexiones por nodo (k)', min_value=1, max_value=n//2, value=2)
+
+        if ("graph" not in st.session_state or st.session_state.numbers != numbers or st.session_state.n != n or st.session_state.k != k) and grafo_tipo == 'Regular' :
+            st.session_state.n = n
+            st.session_state.k = k
+            st.session_state.rows = 1
+            st.session_state.cols = 1
+            st.session_state.ave = 1
+            st.session_state.calle = 1
+            st.session_state.m = 1
+            st.session_state.p = 1
+            G = nx.random_regular_graph(k, n)
+            pos=nx.spring_layout(G)
+            st.session_state.graph = G
+            st.session_state.pos = pos
+            st.session_state.numbers=numbers
+            edge_weights,edge_thickness = generate_graph_witrh_weights(G,numbers,pos)
+            st.session_state.edge_weights = edge_weights
+            st.session_state.edge_thickness = edge_thickness
+           # st.session_state.grafo_tip=grafo_tipo
+        else:
+            G = st.session_state.graph
+            pos = st.session_state.pos
+            edge_weights = st.session_state.edge_weights
+            edge_thickness = st.session_state.edge_thickness
+
+
     st.sidebar.subheader("Opciones de centralidad")
     centrality_option = st.sidebar.selectbox("Selecciona el tipo de centralidad que desea visualizar :", ["Ninguna","Degree Centrality","Minimo Cenected Time","Betweenness Centrality","Closeness Centrality","Eigenvector Centrality"])
 
@@ -353,6 +418,28 @@ def main():
     elif centrality_option=="Ninguna":
         centrality_value =None
     
+
+# Subheader para añadir aristas
+    st.sidebar.subheader("Añadir una arista")
+    nodes = list(G.nodes())
+
+# Seleccionar dos nodos para crear una nueva arista
+    node1 = st.sidebar.selectbox("Selecciona el primer nodo:", nodes)
+    node2 = st.sidebar.selectbox("Selecciona el segundo nodo:", nodes)
+    peso = st.sidebar.text_area(
+        "Escribe el peso",
+        value=str(2),
+        placeholder="Presiona Enter después de ingresar", height=1)
+    
+# Añadir la arista si no existe
+    if st.sidebar.button("Añadir Arista"):
+        if G.has_edge(node1, node2):
+            st.warning(f"La arista entre {node1} y {node2} ya existe")
+        else:
+            G.add_edge(node1, node2)
+            edge_weights[(node1, node2)] = float(peso)
+            edge_thickness[(node1, node2)] = float(peso) 
+            
     st.sidebar.subheader("Eliminación de aristas")
     edges = list(G.edges())
     selected_edge = st.sidebar.selectbox("Selecciona una arista para eliminar:", edges, format_func=lambda e: f"{e[0]}-{e[1]}")
