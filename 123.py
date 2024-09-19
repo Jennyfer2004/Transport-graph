@@ -2,6 +2,7 @@ import networkx as nx
 import plotly.graph_objects as go
 import streamlit as st
 import random
+import numpy as np
 
 def draw_graph(G, pos, edge_weights, edge_thickness, centrality_value=None, moving_objects=None):
     edge_traces = []
@@ -75,7 +76,7 @@ def draw_graph(G, pos, edge_weights, edge_thickness, centrality_value=None, movi
     return fig
 
 # Crear dos grafos de cuadrícula separados y conectarlos con n aristas
-def create_connected_grid_graphs(rows1, cols1, rows2, cols2, num_edges):
+def create_connected_grid_graphs(rows1, cols1, rows2, cols2, num_edges ,row_deviation1=0, col_deviation1=0, row_deviation2=0, col_deviation2=0):
     G1 = nx.grid_2d_graph(rows1, cols1)  # Primer grafo de cuadrícula
     G2 = nx.grid_2d_graph(rows2, cols2)  # Segundo grafo de cuadrícula
 
@@ -83,6 +84,8 @@ def create_connected_grid_graphs(rows1, cols1, rows2, cols2, num_edges):
     max_col1 = max([node[1] for node in G1.nodes()])
     mapping = {node: (node[0], node[1] + max_col1 + 2) for node in G2.nodes()}  # Desplazar el segundo grafo
     G2 = nx.relabel_nodes(G2, mapping)
+    pos1 = {(x, y): (x + random.uniform(-row_deviation1, row_deviation1), y + random.uniform(-col_deviation1, col_deviation1)) for x, y in G1.nodes()}
+    pos2 = {(x, y): (x + random.uniform(-row_deviation2, row_deviation2), y + random.uniform(-col_deviation2, col_deviation2)) for x, y in G2.nodes()}
 
     # Crear un grafo combinado
     G = nx.compose(G1, G2)
@@ -98,8 +101,8 @@ def create_connected_grid_graphs(rows1, cols1, rows2, cols2, num_edges):
         if not G.has_edge(node1, node2):  # Evitar aristas duplicadas
             G.add_edge(node1, node2)
             edges_added += 1
-
-    return G
+    combined_positions = {**pos1, **pos2}
+    return G,combined_positions
 
 # Función principal de Streamlit
 def main():
@@ -118,11 +121,8 @@ def main():
     num_edges = st.sidebar.slider("Número de aristas entre los grafos", min_value=1, max_value=10, value=1)
     
     # Crear el grafo
-    G = create_connected_grid_graphs(rows1, cols1, rows2, cols2, num_edges)
-    
-    # Posición de los nodos
-    pos = nx.spring_layout(G)
-    
+    G, pos = create_connected_grid_graphs(rows1, cols1, rows2, cols2, num_edges,0,0,0,0.1)
+
     # Pesos y grosor de las aristas
     edge_weights = {edge: 1 for edge in G.edges()}
     edge_thickness = {edge: 2 for edge in G.edges()}
