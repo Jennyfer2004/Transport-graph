@@ -7,14 +7,15 @@ import plotly.graph_objects as go
 import time
 
 # Crear un grafo de cuadrícula y conectarlos con n aristas
-def create_connected_grid_graphs(rows1, cols1, rows2, cols2, num_edges):
+def create_connected_grid_graphs(rows1, cols1, rows2, cols2, num_edges, row_deviation1=0, col_deviation1=0, row_deviation2=0, col_deviation2=0):
     G1 = nx.grid_2d_graph(rows1, cols1)  # Primer grafo de cuadrícula
     G2 = nx.grid_2d_graph(rows2, cols2)  # Segundo grafo de cuadrícula
 
-    # Renombrar los nodos del segundo grafo para que no se solapen con el primero
     max_col1 = max([node[1] for node in G1.nodes()])
     mapping = {node: (node[0], node[1] + max_col1 + 2) for node in G2.nodes()}  # Desplazar el segundo grafo
     G2 = nx.relabel_nodes(G2, mapping)
+    pos1 = {(x, y): (x + random.uniform(-row_deviation1, row_deviation1), y + random.uniform(-col_deviation1, col_deviation1)) for x, y in G1.nodes()}
+    pos2 = {(x, y): (x + random.uniform(-row_deviation2, row_deviation2), y + random.uniform(-col_deviation2, col_deviation2)) for x, y in G2.nodes()}
 
     # Crear un grafo combinado
     G = nx.compose(G1, G2)
@@ -30,8 +31,9 @@ def create_connected_grid_graphs(rows1, cols1, rows2, cols2, num_edges):
         if not G.has_edge(node1, node2):  # Evitar aristas duplicadas
             G.add_edge(node1, node2)
             edges_added += 1
-
-    return G
+    pos={**pos1, **pos2}
+    
+    return G,pos
 
 def draw_graph(G, pos, edge_weights, edge_thickness,centrality_value=None ,moving_objects=None):
     edge_traces = []
@@ -230,7 +232,16 @@ def main():
         if "graph" not in st.session_state or (st.session_state.n != n or st.session_state.numbers != numbers or st.session_state.p != p) :
             st.session_state.n = n
             st.session_state.p = p
-            st.session_state.m = 1
+            st.session_state.m = 1        
+            st.session_state.row_dev_1 = 1
+            st.session_state.row_dev_2 = 1
+            st.session_state.col_dev_1 = 1
+            st.session_state.col_dev_2 = 1
+            st.session_state.rows1 = 1
+            st.session_state.rows2 = 1
+            st.session_state.cols1 = 1
+            st.session_state.cols2 = 1
+            st.session_state.num_edges = 1
             st.session_state.rows = 1
             st.session_state.cols = 1
             st.session_state.ave = 1
@@ -261,7 +272,16 @@ def main():
             st.session_state.rows = 1
             st.session_state.cols = 1
             st.session_state.ave = 1
-            st.session_state.calle = 1
+            st.session_state.calle = 1        
+            st.session_state.rows1 = 1
+            st.session_state.rows2 = 1
+            st.session_state.cols1 = 1
+            st.session_state.cols2 = 1
+            st.session_state.num_edges = 1    
+            st.session_state.row_dev_1 = 1
+            st.session_state.row_dev_2 = 1
+            st.session_state.col_dev_1 = 1
+            st.session_state.col_dev_2 = 1
             st.session_state.k = 1
             G = nx.barabasi_albert_graph(n, m)
             pos=nx.spring_layout(G)
@@ -302,7 +322,16 @@ def main():
             st.session_state.n = 1
             st.session_state.m = 1
             st.session_state.k = 1
-            st.session_state.p = 1
+            st.session_state.p = 1        
+            st.session_state.rows1 = 1
+            st.session_state.rows2 = 1
+            st.session_state.cols1 = 1
+            st.session_state.cols2 = 1
+            st.session_state.num_edges = 1    
+            st.session_state.row_dev_1 = 1
+            st.session_state.row_dev_2 = 1
+            st.session_state.col_dev_1 = 1
+            st.session_state.col_dev_2 = 1
             st.session_state.pos = pos
             st.session_state.edge_weights = edge_weights
             st.session_state.edge_thickness = edge_thickness
@@ -316,29 +345,54 @@ def main():
             edge_thickness = st.session_state.edge_thickness
 
     elif grafo_tipo == 'N- Gird 2D Graph':
-        rows1 = st.sidebar.slider("Filas del primer grafo", min_value=2, max_value=10, value=3)
-        cols1 = st.sidebar.slider("Columnas del primer grafo", min_value=2, max_value=10, value=3)
-    
-        rows2 = st.sidebar.slider("Filas del segundo grafo", min_value=2, max_value=10, value=3)
-        cols2 = st.sidebar.slider("Columnas del segundo grafo", min_value=2, max_value=10, value=3)
-    
-    # Número de aristas que conectan los grafos
+        rows1 = st.sidebar.number_input("Elija la cantidad de Calles del primer grafo", min_value=1, value=3)
+        cols1 = st.sidebar.number_input("Elija la cantidad de Avenidas del primer grafo", min_value=1, value=3)
+
+        rows2 = st.sidebar.number_input("Elija la cantidad de Calles del segundo grafo", min_value=1, value=4)
+        cols2 = st.sidebar.number_input("Elija la cantidad de Avenidas del segundo grafo", min_value=1, value=4)
+
         num_edges = st.sidebar.slider("Número de aristas entre los grafos", min_value=1, max_value=10, value=1)
-    
-        if ("graph" not in st.session_state or st.session_state.num_edges != num_edges or st.session_state.rows1 != rows1 or st.session_state.rows2 != rows2 or st.session_state.cols2 != cols2 or st.session_state.cols1 != cols1) and grafo_tipo == 'Regular' :
+        
+        row_dev_1 = st.sidebar.select_slider(
+        "Selecciona el grado de desviación que van a tener las calles del primer grafo",
+        options=[0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1],
+        value=0
+        )    
+        col_dev_1 = st.sidebar.select_slider(
+        "Selecciona el grado de desviación que van a tener las avenidas del primer grafo",
+        options=[0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1],
+        value=0
+        )
+        row_dev_2 = st.sidebar.select_slider(
+        "Selecciona el grado de desviación que van a tener las calles del segundo grafo",
+        options=[0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1],
+        value=0
+        )    
+        col_dev_2 = st.sidebar.select_slider(
+        "Selecciona el grado de desviación que van a tener las avenidas del segundo grafo",
+        options=[0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1],
+        value=0
+        )
+        
+        if ("graph" not in st.session_state or st.session_state.num_edges != num_edges or st.session_state.row_dev_1 != row_dev_1 or st.session_state.row_dev_2 != row_dev_2 or st.session_state.col_dev_1 != col_dev_1 or st.session_state.col_dev_2 != col_dev_2  or st.session_state.rows1 != rows1 or st.session_state.rows2 != rows2 or st.session_state.cols2 != cols2 or st.session_state.cols1 != cols1) :
             st.session_state.rows1 = rows1
             st.session_state.rows2 = rows2
             st.session_state.cols1 = cols1
             st.session_state.cols2 = cols2
+            st.session_state.row_dev_1 = row_dev_1
+            st.session_state.row_dev_2 = row_dev_2
+            st.session_state.col_dev_1 = col_dev_1
+            st.session_state.col_dev_2 = col_dev_2
             st.session_state.num_edges = num_edges
             st.session_state.rows = 1
             st.session_state.cols = 1
             st.session_state.ave = 1
             st.session_state.calle = 1
+            st.session_state.n = 1
+            st.session_state.k = 1
             st.session_state.m = 1
             st.session_state.p = 1
-            G = create_connected_grid_graphs(rows1, cols1, rows2, cols2, num_edges)
-            pos=nx.spring_layout(G)
+            G,pos = create_connected_grid_graphs(rows1, cols1, rows2, cols2, num_edges, row_dev_1, col_dev_1, row_dev_2, col_dev_2)
             st.session_state.graph = G
             st.session_state.pos = pos
             st.session_state.numbers=numbers
@@ -361,7 +415,16 @@ def main():
         if ("graph" not in st.session_state or st.session_state.numbers != numbers or st.session_state.n != n or st.session_state.k != k or st.session_state.p != p) and grafo_tipo == 'Watts-Strogatz':
             st.session_state.k = k
             st.session_state.n = n
-            st.session_state.p = p
+            st.session_state.p = p            
+            st.session_state.rows1 = 1    
+            st.session_state.row_dev_1 = 1
+            st.session_state.row_dev_2 = 1
+            st.session_state.col_dev_1 = 1
+            st.session_state.col_dev_2 = 1
+            st.session_state.rows2 = 1
+            st.session_state.cols1 = 1
+            st.session_state.cols2 = 1
+            st.session_state.num_edges = 1
             st.session_state.rows = 1
             st.session_state.cols = 1
             st.session_state.ave = 1
@@ -391,9 +454,18 @@ def main():
             st.session_state.rows = 1
             st.session_state.cols = 1
             st.session_state.ave = 1
-            st.session_state.calle = 1
+            st.session_state.calle = 1    
+            st.session_state.row_dev_1 = 1
+            st.session_state.row_dev_2 = 1
+            st.session_state.col_dev_1 = 1
+            st.session_state.col_dev_2 = 1
             st.session_state.m = 1
-            st.session_state.p = 1
+            st.session_state.p = 1        
+            st.session_state.rows1 = 1
+            st.session_state.rows2 = 1
+            st.session_state.cols1 = 1
+            st.session_state.cols2 = 1
+            st.session_state.num_edges = 1
             G = nx.random_regular_graph(k, n)
             pos=nx.spring_layout(G)
             st.session_state.graph = G
