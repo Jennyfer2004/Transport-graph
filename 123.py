@@ -82,7 +82,7 @@ def draw_graph(G, pos, edge_weights, edge_thickness,node_semaforo_status,central
             node_x.append(x)
             node_y.append(y)
             text.append(str(node) + "     " + node_semaforo_status[node])
-            print(text)
+            
             #text.append(node_semaforo_status[node])
             node_size.append(10)
             node_color.append(0.5)
@@ -226,7 +226,6 @@ def main():
 
         if "graph" not in st.session_state or st.session_state.rows != rows or st.session_state.cols != cols or st.session_state.ave != ave or st.session_state.calle != calle or st.session_state.numbers != numbers:
         # Crear el grafo de la red de transporte
-
             G, pos, edge_weights, edge_thickness = create_transport_graph(rows, cols,calle,ave,numbers)
             st.session_state.graph = G
             st.session_state.pos = pos
@@ -244,13 +243,16 @@ def main():
             edge_thickness = st.session_state.edge_thickness
         st.sidebar.subheader("Opciones de centralidad")
         centrality_option = st.sidebar.selectbox("Selecciona el tipo de centralidad que desea visualizar :", ["Ninguna","Degree Centrality","Minimo Cenected Time","Betweenness Centrality","Closeness Centrality","Eigenvector Centrality"])
+        
         selected_node_s = st.sidebar.selectbox("Introduce el nodo de semaforos que desea ", list(G.nodes()))
         node_semaforo_status = {node : "cruce" for node in G.nodes()}
         if st.sidebar.button("Agregar el semáforo :"):
             node_semaforo_status[selected_node_s]="semáforo"
+        if "node_semaforo_status" not in st.session_state:
+            st.session_state.node_semaforo_status=node_semaforo_status
         if centrality_option:
             centrality_value =calculate_centrality(G,centrality_option)
-            print(centrality_value)
+            
         elif centrality_option=="Ninguna":
             centrality_value =None
         st.sidebar.write("Seleccione si desea ver :")
@@ -397,7 +399,7 @@ def main():
                 moving_objects = new_moving_objects
 
         # Actualizar el grafo
-                fig = draw_graph(G, pos, edge_weights, edge_thickness, centrality_value, moving_objects)
+                fig = draw_graph(G, pos, edge_weights, edge_thickness,node_semaforo_status, centrality_value, moving_objects)
                 graph_placeholder.plotly_chart(fig)
 
         # Esperar un momento antes de la siguiente actualización
