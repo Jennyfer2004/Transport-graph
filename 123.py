@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import random
 import time
 import math
+import itertools
 
 def create_transport_graph(rows, cols,calle,ave, weights):
     G = nx.grid_2d_graph(rows, cols)
@@ -81,8 +82,10 @@ def draw_graph(G, pos, edge_weights, edge_thickness,node_semaforo_status,central
             x, y = pos[node]
             node_x.append(x)
             node_y.append(y)
-            text.append(str(node) + "     " + node_semaforo_status[node])
-            
+            if node in node_semaforo_status:
+                text.append(str(node) + "     " + node_semaforo_status[node])
+            else:
+                text.append(str(node))
             #text.append(node_semaforo_status[node])
             node_size.append(10)
             node_color.append(0.5)
@@ -168,15 +171,29 @@ def calculate_centrality(G,nombre):
            conection_times[node]=0.3-(total_time/1000)
         return conection_times
     
-def get_random_closest_edge(pos, current_node, previous_node):
+def get_random_closest_edge(G, current_node, previous_node,edge,bol):
     # Obtener las aristas adyacentes al nodo actual
     adjacent_edges = list(G.edges(current_node))
-
+    
     possible_edges = []
    
     for edge in adjacent_edges:
-        next_node = edge[1] if edge[0] == current_node else edge[0]
+        if bol:
+            estado_de_edge = G.edges[edge]['estado']
+            if edge[0] == current_node and estado_de_edge:
+                next_node = edge[1]
+            elif estado_de_edge:
+                edge[0]
+            else:
+                continue
+        else:
+            next_node = edge[1] if edge[0] == current_node else edge[0]
 
+        if next_node == previous_node:
+            if len(adjacent_edges)==1 :
+                return edge
+            continue
+        possible_edges.append(edge)
         if next_node == previous_node:
             if len(adjacent_edges)==1 :
                 return edge
@@ -187,13 +204,70 @@ def get_random_closest_edge(pos, current_node, previous_node):
     if possible_edges:
         return random.choice(possible_edges)
     else:
-        return None
+        return edge
+
 
 def assign_semaforos_to_nodes(G,percent):
     total_nodes=len(G.nodes())
     sum_semaforos= int((percent*total_nodes)/100)
     semaforo_nodes= random.sample(G.nodes(),sum_semaforos)
     return semaforo_nodes
+
+def semaforo(nodo_semaforo_status):
+    for i in nodo_semaforo_status:
+        arist=list(G.edges(i))
+        sum_arist=len(arist)
+        n=sum_arist*5
+        for j in arist:
+
+            print(j)
+
+
+    return
+def ciclo_semaforo(nodo_semaforo_status):
+    # Alterna entre los estados de semáforo: Verde, Amarillo, Rojo
+    estados = itertools.cycle(['Verde','Rojo'])
+    for i in nodo_semaforo_status:
+        arist=list(G.edges(i))
+        sum_arist=len(arist)
+        n=sum_arist*5
+    while True:
+        if next(estados)=="Verde":
+            time.sleep(2)
+            yield next(estados)
+        else :
+            time.sleep(n)
+            yield next(estados)
+
+def update_semaforo(nodo_semaforo_status):
+    for nodo, semaforo_gen in nodo_semaforo_status.items():
+        nodo_semaforo_status[nodo] = next(semaforo_gen)
+def inicializar_grafo_con_aristas(G,arist):
+    # Obtén la lista de todas las aristas
+    aristas = list(G.edges())
+    for i, edge in enumerate(aristas):
+        if i in arist:
+            G.edges[edge]['estado'] = False  # Verde
+        else:
+            G.edges[edge]['estado'] = True  # Rojo
+            
+def ciclo_arista():
+    # Alterna entre los estados de la arista: True (Verde) y False (Rojo)
+    estados = itertools.cycle([True, False])
+    while True:
+        yield next(estados)
+
+# Función para actualizar el estado de las aristas
+def update_estado_aristas(G, arista_estado_generadores):
+    for arista, estado_gen in arista_estado_generadores.items():
+        G.edges[arista]['estado'] = next(estado_gen)  # Cambia el estado de la arista a True o False
+
+# Función para inicializar el generador de estados para cada arista
+def inicializar_generadores_aristas(G):
+    
+    return {
+        edge: ciclo_arista() for edge in G.edges()
+    }
 def main():
         global G  
 
@@ -223,12 +297,14 @@ def main():
         rows = st.sidebar.number_input("Elija la cantidad de Calles", min_value=1, value=5)
         cols = st.sidebar.number_input("Elija la cantidad de Avenidas", min_value=1, value=5)
         num_objects = st.sidebar.number_input("Elija la cantidad de Objetos en Movimiento", min_value=1, value=3)
-
+        node_semaforo_status = {}
+        edge_status={}
         if "graph" not in st.session_state or st.session_state.rows != rows or st.session_state.cols != cols or st.session_state.ave != ave or st.session_state.calle != calle or st.session_state.numbers != numbers:
         # Crear el grafo de la red de transporte
             G, pos, edge_weights, edge_thickness = create_transport_graph(rows, cols,calle,ave,numbers)
             st.session_state.graph = G
             st.session_state.pos = pos
+            st.session_state.node_semaforo_status=node_semaforo_status
             st.session_state.edge_weights = edge_weights
             st.session_state.edge_thickness = edge_thickness
             st.session_state.rows = rows
@@ -244,12 +320,25 @@ def main():
         st.sidebar.subheader("Opciones de centralidad")
         centrality_option = st.sidebar.selectbox("Selecciona el tipo de centralidad que desea visualizar :", ["Ninguna","Degree Centrality","Minimo Cenected Time","Betweenness Centrality","Closeness Centrality","Eigenvector Centrality"])
         
-        selected_node_s = st.sidebar.selectbox("Introduce el nodo de semaforos que desea ", list(G.nodes()))
-        node_semaforo_status = {node : "cruce" for node in G.nodes()}
-        if st.sidebar.button("Agregar el semáforo :"):
-            node_semaforo_status[selected_node_s]="semáforo"
-        if "node_semaforo_status" not in st.session_state:
-            st.session_state.node_semaforo_status=node_semaforo_status
+        def actualizar_estado_aristas():
+            update_estado_aristas(G, st.session_state.arista_estado_generadores)
+               
+        selected_node_s = st.sidebar.multiselect("Introduce el nodo de semaforos que desea", list(G.nodes()), default=[])
+        if selected_node_s:
+            for i in selected_node_s:
+                node_semaforo_status[i]= "semáforo"
+
+                arist=list(G.edges(i))
+                inicializar_grafo_con_aristas(G,arist)
+                st.session_state.node_semaforo_status=node_semaforo_status
+                st.session_state.arista_estado_generadores = inicializar_generadores_aristas(G)
+
+    # Función para actualizar los estados de las aristas cada 5 segundos
+ 
+        semaforo(node_semaforo_status)
+       # if "edge_status" not in st.seasion_state:
+         #   st.seasion_state.edge_status=edge_status
+        
         if centrality_option:
             centrality_value =calculate_centrality(G,centrality_option)
             
@@ -303,13 +392,17 @@ def main():
         selected_edge = st.sidebar.selectbox("Selecciona una arista para eliminar:", edges, format_func=lambda e: f"{e[0]}-{e[1]}")
 
         if st.sidebar.button("Eliminar Arista"):
+            #print(selected_edge)
             if selected_edge in G.edges():
                 G.remove_edge(*selected_edge)
                 edge_weights.pop(selected_edge, None)
                 edge_thickness.pop(selected_edge, None)
+                st.session_state.graph = G
+                st.session_state.edge_weights = edge_weights
+                st.session_state.edge_thickness = edge_thickness
             else:
                 st.error(f"Arista {selected_edge} no encontrada")
-
+                
         # Opción para eliminar nodos
         st.sidebar.subheader("Eliminación de Nodos")
         nodes = list(G.nodes())
@@ -322,7 +415,8 @@ def main():
                 for edge in edges_to_eliminate:
                     edge_weights.pop(edge, None)
                     edge_thickness.pop(edge, None)
-                pos={node:pos[node] for node in G.nodes()}
+                pos.pop(selected_node)
+                #pos={node:pos[node] for node in G.nodes()}
                 st.session_state.pos=pos
             else:
                 st.error(f"Nodo {selected_node} no encontrado")
@@ -339,15 +433,15 @@ def main():
         st.sidebar.subheader("Visualización del Recorrido")
         ready=st.sidebar.button("Inicializar Movimiento")      
         closed=st.sidebar.button("Detener Movimiento")
+
         if ready or st.session_state.moving:
             if not st.session_state.moving:
                 st.session_state.moving=True
             if "moving_objects" not in st.session_state:
                 st.session_state.moving_objects = {}
-
             moving_objects = st.session_state.moving_objects  # Cargar los objetos ya existentes
-            #print(num_objects,len(moving_objects))
-    # Añadir nuevos objetos sin sobrescribir los existentes
+            
+            # Añadir nuevos objetos sin sobrescribir los existentes
             # Crear objetos en movimiento solo si hay menos de num_objects en total
             current_num_objects = sum(len(objects) for objects in moving_objects.values())  # Total de objetos actuales
             if current_num_objects > num_objects:
@@ -378,14 +472,18 @@ def main():
         'color': 'red' if i == 0 else f'rgba({random.randint(0,255)}, {random.randint(0,255)}, {random.randint(0,255)}, 1)'
     })
             st.session_state.moving_objects = moving_objects  # Guardar el nuevo estado
-    
+            print(moving_objects)
     # Mover los objetos (misma lógica que antes)
+            count=0
             while st.session_state.moving:
                 new_moving_objects = {}
                 for edge, objects_on_edge in moving_objects.items():
                     for obj in objects_on_edge:
                 # Moverse a una arista adyacente aleatoria
-                        closest_edge = get_random_closest_edge(pos, obj['current_edge'][1], obj['previous_node'])
+                        if selected_node_s:
+                            closest_edge = get_random_closest_edge(G, obj['current_edge'][1], obj['previous_node'],edge,True)
+                        else:
+                            closest_edge = get_random_closest_edge(G, obj['current_edge'][1], obj['previous_node'],edge,False)
                         if closest_edge is None:
                            continue
 
@@ -403,7 +501,10 @@ def main():
                 graph_placeholder.plotly_chart(fig)
 
         # Esperar un momento antes de la siguiente actualización
-                time.sleep(2)
+                time.sleep(2)                
+                count+=1
+                if count%3==0 and selected_node_s:
+                    actualizar_estado_aristas() 
 
 if __name__ == "__main__":
     main()
