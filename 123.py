@@ -170,7 +170,7 @@ def calculate_centrality(G,nombre):
            conection_times[node]=0.3-(total_time/1000)
         return conection_times
     
-def get_random_closest_edge(G, current_node, previous_node,edges,vias,bol,stop,vel=True):
+def get_random_closest_edge(G, current_node, previous_node,edges,vias,bol,stop,vel=True,vel_cols=True):
     # Obtener las aristas adyacentes al nodo actual
     adjacent_edges = list(G.edges(current_node))
     possible_edges = []
@@ -192,8 +192,7 @@ def get_random_closest_edge(G, current_node, previous_node,edges,vias,bol,stop,v
                 return edge
             continue
         possible_edges.append(edge)
-    if not vel:
-        print(vel,"aqui")
+    if not vel or not vel_cols:
         return edges
     if vias or not stop or not vel:
         return edges
@@ -318,13 +317,28 @@ def main():
         all_nodes = list(G.nodes())
         filtered_nodes = [node for node in all_nodes if node not in selected_node_s]
 
-        selected_ceda= st.sidebar.multiselect("Introduce el nodo de ceda el paso que desea", filtered_nodes, default=[(1,1)])
-        if selected_ceda:
-            for i in selected_ceda:
-                node_semaforo_status[i]= "ceda_el_paso"
+        selected_ceda_rows= st.sidebar.multiselect("Introduce el nodo de ceda el paso que desea para las avenidas", filtered_nodes, default=[(1,1)])
+        if selected_ceda_rows:
+            for i in selected_ceda_rows:                
+                if i in st.session_state.node_semaforo_status:
+                    st.session_state.node_semaforo_status[i]== "ceda_el_paso(calle)"
+                    node_semaforo_status[i]= "ceda_el_paso"
+                    st.session_state.node_semaforo_status=node_semaforo_status
+                    continue
+                node_semaforo_status[i]= "ceda_el_paso(ave)"
                 st.session_state.node_semaforo_status=node_semaforo_status
-                
-        filtered_nodes = [node for node in filtered_nodes if node not in selected_ceda]
+        selected_ceda_cols= st.sidebar.multiselect("Introduce el nodo de ceda el paso que desea para las calles", filtered_nodes, default=[(0,1)])
+        if selected_ceda_cols:
+            for i in selected_ceda_cols:
+                if i in st.session_state.node_semaforo_status:
+                    st.session_state.node_semaforo_status[i]== "ceda_el_paso(ave)"
+                    node_semaforo_status[i]= "ceda_el_paso"
+                    st.session_state.node_semaforo_status=node_semaforo_status
+                    continue
+                node_semaforo_status[i]= "ceda_el_paso(calle)"
+                st.session_state.node_semaforo_status=node_semaforo_status
+
+        filtered_nodes = [node for node in filtered_nodes if node not in selected_ceda_rows and node not in selected_ceda_cols ]
         selected_stop= st.sidebar.multiselect("Introduce el nodo de pare que desea", filtered_nodes, default=[(0,0)])
         if selected_stop:
             for i in selected_stop:
@@ -341,7 +355,17 @@ def main():
                 for j in range(rows):
                     aristas_fila = [(u, v) for u, v in G.edges() if u[1] == i and v[1] == i]
                     st.session_state.nodos_fila=aristas_fila
-               
+
+        if "nodos_cols" not in st.session_state:
+            st.session_state.nodos_cols= []
+
+        selected_vel_row= st.sidebar.multiselect("Introduce las calles que desea restringir la velocidad", list(range(rows)))
+        if selected_vel_row:
+            for i in selected_vel_row:
+                for j in range(cols):
+                    edge_cols = [(u, v) for u, v in G.edges() if u[0] == i and v[0] == i]
+                    st.session_state.nodos_cols=edge_cols
+            print(st.session_state.nodos_cols)
          #   st.seasion_state.edge_status=edge_status
         
         if centrality_option:
@@ -482,7 +506,8 @@ def main():
             count=0
             stop={}
             vel={}
-            while st.session_state.moving:
+            vel_cols={}
+            while st.session_state.moving and not closed:
                 new_moving_objects = {}
 
                 for edge, objects_on_edge in moving_objects.items():
@@ -496,12 +521,24 @@ def main():
                                 vel[obj['id']]=True
                             elif vel[obj['id']]==True:
                                 vel[obj['id']]=False
-                            print(vel,st.session_state.nodos_fila,11111,edge)
+                            #print(vel,st.session_state.nodos_fila,11111,edge)
+                        if not obj['id'] in vel_cols:
+                            vel_cols[obj['id']]=True
+                        if edge in st.session_state.nodos_cols:
+                            if vel_cols[obj['id']]==False:
+                                vel_cols[obj['id']]=True
+                            elif vel_cols[obj['id']]==True:
+                                vel_cols[obj['id']]=False
+
                         if edge[1] in node_semaforo_status:
-                            if node_semaforo_status[edge[1]]=="ceda_el_paso":
+                            if node_semaforo_status[edge[1]]=="ceda_el_paso(ave)":
+                                adjacent_edges = [(u, v) for u, v in G.edges(edge[1]) if u[1] == i and v[1] == i]
+                            elif node_semaforo_status[edge[1]]=="ceda_el_paso":
                                 adjacent_edges = list(G.edges(edge[1]))
-                                
-                                for i in adjacent_edges:
+                            elif node_semaforo_status[edge[1]]=="ceda_el_paso(calle)":
+                                adjacent_edges = [(u, v) for u, v in G.edges(edge[1]) if u[0] == i and v[0] == i]
+              
+                            for i in adjacent_edges:
                                     j=i[1]
                                     if edge[1][0]== obj['previous_node'][0] :
                                         if edge[1][1]!=j[1]:
@@ -514,6 +551,7 @@ def main():
                                         else:
                                             if i in moving_objects and moving_objects[i]:
                                                k.append(i)
+                                
                         if not obj['id'] in stop:
                              stop[obj['id']]=True
                         if selected_stop and edge[1] in node_semaforo_status and node_semaforo_status[edge[1]]=="pare":
@@ -526,9 +564,9 @@ def main():
 
                         #print(stop,obj['current_edge'])
                         if selected_node_s :
-                                closest_edge = get_random_closest_edge(G, obj['current_edge'][1], obj['previous_node'],edge,k,True,stop[obj['id']],vel[obj['id']])
+                                closest_edge = get_random_closest_edge(G, obj['current_edge'][1], obj['previous_node'],edge,k,True,stop[obj['id']],vel[obj['id']],vel_cols[obj['id']])
                         else:
-                                closest_edge = get_random_closest_edge(G, obj['current_edge'][1], obj['previous_node'],edge,k,False,stop[obj['id']],vel[obj['id']])
+                                closest_edge = get_random_closest_edge(G, obj['current_edge'][1], obj['previous_node'],edge,k,False,stop[obj['id']],vel[obj['id']],vel_cols[obj['id']])
                         
                         if closest_edge==obj['current_edge'] :
                             if closest_edge not in new_moving_objects:
