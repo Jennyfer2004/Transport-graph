@@ -200,7 +200,7 @@ def calculate_centrality(G,nombre):
            conection_times[node]=0.3-(total_time/1000)
         return conection_times
 
-def get_random_closest_edge(G, current_node, previous_node,edges,vias,bol,stop,vel=True,vel_cols=True):
+def get_random_closest_edge(G, current_node, previous_node,edges,vias,bol,stop,vel=True,vel_cols=True,vel_edge_bool=True):
     # Obtener las aristas adyacentes al nodo actual
     adjacent_edges = list(G.edges(current_node))
     possible_edges = []
@@ -222,7 +222,7 @@ def get_random_closest_edge(G, current_node, previous_node,edges,vias,bol,stop,v
                 return edge
             continue
         possible_edges.append(edge)
-    if not vel or not vel_cols:
+    if not vel or not vel_cols or not vel_edge_bool:
         return edges
     if vias or not stop or not vel:
         return edges
@@ -267,44 +267,22 @@ def generate_graph_witrh_weights(G,weights,pos):
         edge_weights[edge]=weight
         edge_thickness[edge]=weight
     return edge_weights,edge_thickness
-def expand_grid(G):
-    new_nodes = []
+
+def expand_city(G, expansion_prob):
+    nodes_to_expand = list(G.nodes)
     new_edges = []
 
-    # Expansión hacia el norte
-    if G.number_of_nodes() > 0:
-        north_nodes = list(G.nodes())[-1]
-        new_node = (north_nodes[0], north_nodes[1] - 1)
-        new_nodes.append(new_node)
-        new_edge = ((north_nodes[0], north_nodes[1]), new_node)
-        new_edges.append(new_edge)
+    for node in nodes_to_expand:
+        # Buscar vecinos fuera del límite actual del grafo
+        neighbors = [(node[0]+1, node[1]), (node[0]-1, node[1]), 
+                     (node[0], node[1]+1), (node[0], node[1]-1)]
         
-    # Expansión hacia el sur
-    if G.number_of_nodes() > 0:
-        south_nodes = list(G.nodes())[0]
-        new_node = (south_nodes[0], south_nodes[1] + 1)
-        new_nodes.append(new_node)
-        new_edge = ((south_nodes[0], south_nodes[1]), new_node)
-        new_edges.append(new_edge)
-
-    # Expansión hacia el este
-    if G.number_of_nodes() > 0:
-        east_nodes = list(G.nodes())[-1]
-        new_node = (east_nodes[0] + 1, east_nodes[1])
-        new_nodes.append(new_node)
-        new_edge = ((east_nodes[0], east_nodes[1]), new_node)
-        new_edges.append(new_edge)
-
-    # Expansión hacia el oeste
-    if G.number_of_nodes() > 0:
-        west_nodes = list(G.nodes())[0]
-        new_node = (west_nodes[0] - 1, west_nodes[1])
-        new_nodes.append(new_node)
-        new_edge = ((west_nodes[0], west_nodes[1]), new_node)
-        new_edges.append(new_edge)
-        
-    return new_nodes, new_edges
-
+        for neighbor in neighbors:
+            if neighbor not in G.nodes and random.random() < expansion_prob:
+                new_edges.append((node, neighbor))
+    
+    G.add_edges_from(new_edges)
+    return new_edges
 def main():
     global G 
     st.title('Generador de Redes de Transporte')
@@ -366,7 +344,7 @@ def main():
             st.session_state.edge_thickness = edge_thickness
             st.session_state.numbers=numbers
             st.session_state.graph = G
-            #st.session_state.grafo_tip=grafo_tipo
+            
         else:
             G = st.session_state.graph
             pos = st.session_state.pos
@@ -446,13 +424,16 @@ def main():
             edge_weights,edge_thickness = generate_graph_witrh_weights(G,numbers,pos)
             st.session_state.edge_weights = edge_weights
             st.session_state.edge_thickness = edge_thickness
-           # st.session_state.grafo_tip=grafo_tipo
+
         else:
             G = st.session_state.graph
             pos = st.session_state.pos
             edge_weights = st.session_state.edge_weights
             edge_thickness = st.session_state.edge_thickness
-
+        
+        all_edges = list(G.edges())
+        selected_edges_vel = st.sidebar.multiselect("Introduce los tramos de reducción de velocidad que desea", all_edges, default=[])
+    
     st.sidebar.subheader("Opciones de centralidad")
     centrality_option = st.sidebar.selectbox("Selecciona el tipo de centralidad que desea visualizar :", ["Ninguna","Degree Centrality","Minimo Cenected Time","Betweenness Centrality","Closeness Centrality","Eigenvector Centrality"])
 
@@ -464,20 +445,22 @@ def main():
     def actualizar_estado_aristas():
             update_estado_aristas(G, st.session_state.arista_estado_generadores)
     n = st.sidebar.slider('Seleccione cuantas veces lo desea', value=0)
-    if n>0:
+    expansion_probability = st.sidebar.slider('Seleccione cuantas veces lo desea', value=0.3 )
+    if not "n" in st.session_state:
+        st.session_state.n=n
+    if not "numbers_edge" in st.session_state:
+        numbers_edge={}
+        st.session_state.numbers_edge=numbers_edge
+    if n!= st.session_state.n :
+        st.session_state.n=n
         if grafo_tipo == 'N- Gird 2D Graph':
 
             for _ in range(n):  # Expandir 10 veces
-                new_nodes, new_edges = expand_grid(st.session_state.graph )
-    
-                if new_nodes:
-                    st.session_state.graph.add_nodes_from(new_nodes)
-                    st.session_state.graph.add_edges_from(new_edges)
-                    
-                    #print(f"Expandido grafo. Nodos adicionales: {len(new_nodes)}, Aristas adicionales: {len(new_edges)}")
+                numbers_edge=expand_city(G, expansion_probability)
+                if 'N- Gird 2D Graph' in st.session_state.numbers_edge:
+                    st.session_state.numbers_edge['N- Gird 2D Graph']+=numbers_edge
                 else:
-                    break  # Si no hay más nodos para expandir, salimos del bucle
-                
+                    st.session_state.numbers_edge['N- Gird 2D Graph']=numbers_edge
             calles=random.choice([col_dev_1,col_dev_2])
             aves=random.choice([row_dev_1,row_dev_2])
             for node in G.nodes():
@@ -490,15 +473,11 @@ def main():
             #print(f"Expanción finalizada. Nodos totales: {G.number_of_nodes()}, Aristas totales: {G.number_of_edges()}")
         else:
             for _ in range(n):  # Expandir 10 veces
-                new_nodes, new_edges = expand_grid(st.session_state.graph )
-    
-                if new_nodes:
-                    st.session_state.graph.add_nodes_from(new_nodes)
-                    st.session_state.graph.add_edges_from(new_edges)
-                    
-                    #print(f"Expandido grafo. Nodos adicionales: {len(new_nodes)}, Aristas adicionales: {len(new_edges)}")
+                numbers_edge=expand_city(G, expansion_probability)
+                if 'Grid 2D Graph' in st.session_state.numbers_edge:
+                    st.session_state.numbers_edge['Gird 2D Graph']+=numbers_edge
                 else:
-                    break  # Si no hay más nodos para expandir, salimos del bucle
+                    st.session_state.numbers_edge['Gird 2D Graph']=numbers_edge
             for node in G.nodes():
                 if node not in pos:
                     pos[node]=(node[0] + random.uniform(-calle, calle), node[1] + random.uniform(-ave, ave))
@@ -506,8 +485,8 @@ def main():
                 if edge not in edge_weights:
                     edge_weights[edge]=random.choice([2, 4])
                     edge_thickness[edge]=random.choice([2, 4])
-            #print(f"Expanción finalizada. Nodos totales: {G.number_of_nodes()}, Aristas totales: {G.number_of_edges()}")
-        
+        st.session_state.graph=G
+    #print(numbers_edge) 
     all_nodes = list(G.nodes())
     filtered_nodes = [node for node in all_nodes if node!=(0,0) and node!=(0,1)]
     selected_node_s = st.sidebar.multiselect("Introduce el nodo de semaforos que desea", filtered_nodes, default=[])
@@ -621,11 +600,8 @@ def main():
                 st.session_state.moving_objects = {}
             moving_objects = st.session_state.moving_objects  # Cargar los objetos ya existentes
             
-            # Añadir nuevos objetos sin sobrescribir los existentes
-            # Crear objetos en movimiento solo si hay menos de num_objects en total
             current_num_objects = sum(len(objects) for objects in moving_objects.values())  # Total de objetos actuales
             if current_num_objects > num_objects:
-    # Obtener una lista con todos los objetos en movimiento
                 all_objects = [(edge, obj) for edge, objects_on_edge in moving_objects.items() for obj in objects_on_edge]
     
     # Ordenarlos por el 'id' o de alguna manera lógica, por ejemplo
@@ -658,6 +634,8 @@ def main():
             stop={}
             vel={}
             vel_cols={}
+            vel_edges={}
+            vel_edges_bool={}
             while st.session_state.moving and not closed:
                 new_moving_objects = {}
 
@@ -669,7 +647,7 @@ def main():
                             vel[obj['id']]=True
                         
                         if not obj['id'] in vel_cols:
-                                vel_cols[obj['id']]=True
+                            vel_cols[obj['id']]=True
                         if grafo_tipo == 'Grid 2D Graph':
                             
                             if edge in st.session_state.nodos_fila:
@@ -683,7 +661,14 @@ def main():
                                     vel_cols[obj['id']]=True
                                 elif vel_cols[obj['id']]==True:
                                     vel_cols[obj['id']]=False
-
+                        if obj['id'] not in vel_edges_bool:
+                            vel_edges_bool[obj['id']]=True                       
+                        if grafo_tipo =="N- Gird 2D Graph":
+                            if edge in selected_edges_vel:
+                                if vel_edges_bool[obj['id']]==True:
+                                    vel_edges_bool[obj['id']]=False
+                                elif vel_edges_bool[obj['id']]==False:
+                                    vel_edges_bool[obj['id']]=True
                         if edge[1] in node_semaforo_status:
                             if node_semaforo_status[edge[1]]=="ceda_el_paso(ave)":
                                 adjacent_edges = [(u, v) for u, v in G.edges(edge[1]) if u[1] == i and v[1] == i]
@@ -735,18 +720,16 @@ def main():
                         if not obj['id'] in stop:
                              stop[obj['id']]=True
                         if selected_stop and edge[1] in node_semaforo_status and node_semaforo_status[edge[1]]=="pare":
-                            #print(stop[obj['id']],"befor")
                             if stop[obj['id']]==False:
                                 stop[obj['id']]=True
                             elif stop[obj['id']]==True:
                                 stop[obj['id']]=False
-                            #print(stop[obj['id']])
 
                         #print(stop,obj['current_edge'])
                         if selected_node_s :
-                                closest_edge = get_random_closest_edge(G, obj['current_edge'][1], obj['previous_node'],edge,k,True,stop[obj['id']],vel[obj['id']],vel_cols[obj['id']])
+                                closest_edge = get_random_closest_edge(G, obj['current_edge'][1], obj['previous_node'],edge,k,True,stop[obj['id']],vel[obj['id']],vel_cols[obj['id']],vel_edges_bool[obj['id']])
                         else:
-                                closest_edge = get_random_closest_edge(G, obj['current_edge'][1], obj['previous_node'],edge,k,False,stop[obj['id']],vel[obj['id']],vel_cols[obj['id']])
+                                closest_edge = get_random_closest_edge(G, obj['current_edge'][1], obj['previous_node'],edge,k,False,stop[obj['id']],vel[obj['id']],vel_cols[obj['id']],vel_edges_bool[obj['id']])
                         
                         if closest_edge==obj['current_edge'] :
                             if closest_edge not in new_moving_objects:
@@ -772,5 +755,8 @@ def main():
                 count+=1
                 if count%3==0 and selected_node_s:
                     actualizar_estado_aristas() 
+    if closed:
+                st.session_state.moving_objects={}
+                moving_objects={}
 if __name__ =="__main__":
     main()
