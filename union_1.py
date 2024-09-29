@@ -286,13 +286,15 @@ def expand_city(G, expansion_prob):
 def main():
     global G 
     st.title('Generador de Redes de Transporte')
-    st.sidebar.header("Configuración de la Red")
+    st.sidebar.title("Interacción con la Red")
 # Selección del tipo de grafo
 
     grafo_tipo = st.sidebar.selectbox(
     'Selecciona el tipo de grafo para la red de transporte:',
-    [ 'Grid 2D Graph',"N- Gird 2D Graph"]
+    [ 'Grid 2D Graph',"Double Grid 2D Graph"]
 )
+    
+    st.sidebar.header("Configuración de la Red")
 
     input_text = st.sidebar.text_area(
         "Escribe las dimensiones que deseas para los carriles separados por comas:",
@@ -304,10 +306,11 @@ def main():
             except ValueError:
                 numbers = [2,4,6,8]
                 st.sidebar.error("Por favor, introduce solo números separados por comas.")
-    num_objects = st.sidebar.number_input("Elija la cantidad de Objetos en Movimiento", min_value=1, value=3)
+
     node_semaforo_status = {}
         
     if grafo_tipo == 'Grid 2D Graph':
+
         calle = st.sidebar.select_slider(
         "Selecciona el grado de desviación que van a tener las calles",
         options=[0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1],
@@ -320,8 +323,8 @@ def main():
         )
 
 
-        rows = st.sidebar.number_input("Elija la cantidad de Calles", min_value=1, value=5)
-        cols = st.sidebar.number_input("Elija la cantidad de Avenidas", min_value=1, value=5)
+        rows = st.sidebar.number_input("Elija la cantidad de Calles", min_value=1, value=3)
+        cols = st.sidebar.number_input("Elija la cantidad de Avenidas", min_value=1, value=3)
 
         if "graph" not in st.session_state or (st.session_state.numbers != numbers or st.session_state.rows != rows or st.session_state.cols != cols or st.session_state.ave != ave or st.session_state.calle != calle) and grafo_tipo == 'Grid 2D Graph':
             G, pos, edge_weights, edge_thickness = gird_2d(rows, cols,calle,ave,numbers)
@@ -351,28 +354,11 @@ def main():
             edge_weights = st.session_state.edge_weights
             edge_thickness = st.session_state.edge_thickness
         
-        if "nodos_fila" not in st.session_state:
-            st.session_state.nodos_fila= []
+        num_objects = st.sidebar.number_input("Elija la cantidad de Objetos en Movimiento", min_value=1, value=10)
 
-        selected_vel= st.sidebar.multiselect("Introduce las avenidas que desea restringir la velocidad", list(range(cols)))
-        if selected_vel:
-            #print(selected_vel)
-            for i in selected_vel:
-                for j in range(rows):
-                    aristas_fila = [(u, v) for u, v in G.edges() if u[1] == i and v[1] == i]
-                    st.session_state.nodos_fila=aristas_fila
 
-        if "nodos_cols" not in st.session_state:
-            st.session_state.nodos_cols= []
+    elif grafo_tipo == 'Double Grid 2D Graph':
 
-        selected_vel_row= st.sidebar.multiselect("Introduce las calles que desea restringir la velocidad", list(range(rows)))
-        if selected_vel_row:
-            for i in selected_vel_row:
-                for j in range(cols):
-                    edge_cols = [(u, v) for u, v in G.edges() if u[0] == i and v[0] == i]
-                    st.session_state.nodos_cols=edge_cols
-            print(st.session_state.nodos_cols)
-    elif grafo_tipo == 'N- Gird 2D Graph':
         rows1 = st.sidebar.number_input("Elija la cantidad de Calles del primer grafo", min_value=1, value=3)
         cols1 = st.sidebar.number_input("Elija la cantidad de Avenidas del primer grafo", min_value=1, value=3)
 
@@ -431,108 +417,8 @@ def main():
             edge_weights = st.session_state.edge_weights
             edge_thickness = st.session_state.edge_thickness
         
-        all_edges = list(G.edges())
-        selected_edges_vel = st.sidebar.multiselect("Introduce los tramos de reducción de velocidad que desea", all_edges, default=[])
-    
-    st.sidebar.subheader("Opciones de centralidad")
-    centrality_option = st.sidebar.selectbox("Selecciona el tipo de centralidad que desea visualizar :", ["Ninguna","Degree Centrality","Minimo Cenected Time","Betweenness Centrality","Closeness Centrality","Eigenvector Centrality"])
-
-    if centrality_option:
-        centrality_value =calculate_centrality(G,centrality_option)
-    elif centrality_option=="Ninguna":
-        centrality_value =None
-    
-    def actualizar_estado_aristas():
-            update_estado_aristas(G, st.session_state.arista_estado_generadores)
-    n = st.sidebar.slider('Seleccione cuantas veces lo desea', value=0)
-    expansion_probability = st.sidebar.slider('Seleccione cuantas veces lo desea', value=0.3 )
-    if not "n" in st.session_state:
-        st.session_state.n=n
-    if not "numbers_edge" in st.session_state:
-        numbers_edge={}
-        st.session_state.numbers_edge=numbers_edge
-    if n!= st.session_state.n :
-        st.session_state.n=n
-        if grafo_tipo == 'N- Gird 2D Graph':
-
-            for _ in range(n):  # Expandir 10 veces
-                numbers_edge=expand_city(G, expansion_probability)
-                if 'N- Gird 2D Graph' in st.session_state.numbers_edge:
-                    st.session_state.numbers_edge['N- Gird 2D Graph']+=numbers_edge
-                else:
-                    st.session_state.numbers_edge['N- Gird 2D Graph']=numbers_edge
-            calles=random.choice([col_dev_1,col_dev_2])
-            aves=random.choice([row_dev_1,row_dev_2])
-            for node in G.nodes():
-                if node not in pos:
-                    pos[node]=(node[0] + random.uniform(-calles, calles), node[1] + random.uniform(-aves, aves))
-            for edge in G.edges():
-                if edge not in edge_weights:
-                    edge_weights[edge]=random.choice(numbers)
-                    edge_thickness[edge]=random.choice(numbers)
-            #print(f"Expanción finalizada. Nodos totales: {G.number_of_nodes()}, Aristas totales: {G.number_of_edges()}")
-        else:
-            for _ in range(n):  # Expandir 10 veces
-                numbers_edge=expand_city(G, expansion_probability)
-                if 'Grid 2D Graph' in st.session_state.numbers_edge:
-                    st.session_state.numbers_edge['Gird 2D Graph']+=numbers_edge
-                else:
-                    st.session_state.numbers_edge['Gird 2D Graph']=numbers_edge
-            for node in G.nodes():
-                if node not in pos:
-                    pos[node]=(node[0] + random.uniform(-calle, calle), node[1] + random.uniform(-ave, ave))
-            for edge in G.edges():
-                if edge not in edge_weights:
-                    edge_weights[edge]=random.choice([2, 4])
-                    edge_thickness[edge]=random.choice([2, 4])
-        st.session_state.graph=G
-    #print(numbers_edge) 
-    all_nodes = list(G.nodes())
-    filtered_nodes = [node for node in all_nodes if node!=(0,0) and node!=(0,1)]
-    selected_node_s = st.sidebar.multiselect("Introduce el nodo de semaforos que desea", filtered_nodes, default=[])
-    if selected_node_s:
-            for i in selected_node_s:
-                node_semaforo_status[i]= "semáforo"
-
-                arist=list(G.edges(i))
-                inicializar_grafo_con_aristas(G,arist)
-                st.session_state.node_semaforo_status=node_semaforo_status
-                st.session_state.arista_estado_generadores = inicializar_generadores_aristas(G)
-
-    filtered_nodes = [node for node in all_nodes if node not in selected_node_s]
-
-    selected_ceda_rows= st.sidebar.multiselect("Introduce el nodo de ceda el paso que desea para las avenidas", filtered_nodes, default=[])
-    if selected_ceda_rows:
-            for i in selected_ceda_rows:                
-                if i in st.session_state.node_semaforo_status:
-                    st.session_state.node_semaforo_status[i]== "ceda_el_paso(calle)"
-                    node_semaforo_status[i]= "ceda_el_paso"
-                    st.session_state.node_semaforo_status=node_semaforo_status
-                    continue
-                node_semaforo_status[i]= "ceda_el_paso(ave)"
-                st.session_state.node_semaforo_status=node_semaforo_status
-    selected_ceda_cols= st.sidebar.multiselect("Introduce el nodo de ceda el paso que desea para las calles", filtered_nodes, default=[(0,1)])
-    if selected_ceda_cols:
-            for i in selected_ceda_cols:
-                if i in st.session_state.node_semaforo_status:
-                    st.session_state.node_semaforo_status[i]== "ceda_el_paso(ave)"
-                    node_semaforo_status[i]= "ceda_el_paso"
-                    st.session_state.node_semaforo_status=node_semaforo_status
-                    continue
-                node_semaforo_status[i]= "ceda_el_paso(calle)"
-                st.session_state.node_semaforo_status=node_semaforo_status
-
-    filtered_nodes = [node for node in filtered_nodes if node not in selected_ceda_rows and node not in selected_ceda_cols ]
-    selected_stop= st.sidebar.multiselect("Introduce el nodo de pare que desea", filtered_nodes, default=[(0,0)])
-    if selected_stop:
-            for i in selected_stop:
-                node_semaforo_status[i]= "pare"
-                st.session_state.node_semaforo_status=node_semaforo_status
-
-    
-         #   st.seasion_state.edge_status=edge_status
-        
-# Subheader para añadir aristas
+        num_objects = st.sidebar.number_input("Elija la cantidad de Objetos en Movimiento", min_value=1, value=3)
+     
     st.sidebar.subheader("Añadir una arista")
     nodes = list(G.nodes())
 
@@ -584,6 +470,114 @@ def main():
             else:
                 st.error(f"Nodo {selected_node} no encontrado")
 
+
+    st.sidebar.subheader("Opciones de centralidad")
+    centrality_option = st.sidebar.selectbox("Selecciona el tipo de centralidad que desea visualizar :", ["Ninguna","Degree Centrality","Minimo Cenected Time","Betweenness Centrality","Closeness Centrality","Eigenvector Centrality"])
+
+    if centrality_option:
+        centrality_value =calculate_centrality(G,centrality_option)
+    elif centrality_option=="Ninguna":
+        centrality_value =None
+    
+    def actualizar_estado_aristas():
+            update_estado_aristas(G, st.session_state.arista_estado_generadores)
+            
+    st.sidebar.subheader("Opción de expansión")
+    n = st.sidebar.slider('Seleccione cuantas veces lo desea', value=0)
+    expansion_probability = st.sidebar.slider('Seleccione cuantas veces lo desea', value=0.3 )
+   
+    if not "n" in st.session_state:
+        st.session_state.n=n
+    if not "numbers_edge" in st.session_state:
+        numbers_edge={}
+        st.session_state.numbers_edge=numbers_edge
+    if n!= st.session_state.n :
+        st.session_state.n=n
+        if grafo_tipo == 'Double Grid 2D Graph':
+
+            for _ in range(n):  # Expandir 10 veces
+                numbers_edge=expand_city(G, expansion_probability)
+                if 'Double Grid 2D Graph' in st.session_state.numbers_edge:
+                    st.session_state.numbers_edge['Double Grid 2D Graph']+=numbers_edge
+                else:
+                    st.session_state.numbers_edge['Double Grid 2D Graph']=numbers_edge
+            calles=random.choice([col_dev_1,col_dev_2])
+            aves=random.choice([row_dev_1,row_dev_2])
+            for node in G.nodes():
+                if node not in pos:
+                    pos[node]=(node[0] + random.uniform(-calles, calles), node[1] + random.uniform(-aves, aves))
+            for edge in G.edges():
+                if edge not in edge_weights:
+                    edge_weights[edge]=random.choice(numbers)
+                    edge_thickness[edge]=random.choice(numbers)
+            
+        elif grafo_tipo =='Grid 2D Graph':
+            for _ in range(n):  # Expandir 10 veces
+                numbers_edge=expand_city(G, expansion_probability)
+                if 'Grid 2D Graph' in st.session_state.numbers_edge:
+                    st.session_state.numbers_edge['Grid 2D Graph']+=numbers_edge
+                else:
+                    st.session_state.numbers_edge['Grid 2D Graph']=numbers_edge
+            for node in G.nodes():
+                if node not in pos:
+                    pos[node]=(node[0] + random.uniform(-calle, calle), node[1] + random.uniform(-ave, ave))
+            for edge in G.edges():
+                if edge not in edge_weights:
+                    edge_weights[edge]=random.choice([2, 4])
+                    edge_thickness[edge]=random.choice([2, 4])
+        st.session_state.graph=G
+       
+    st.sidebar.subheader("Opciones de señales de transito") 
+
+    all_edges = list(G.edges())
+    selected_edges_vel = st.sidebar.multiselect("Introduce los tramos de reducción de velocidad que desea", all_edges, default=[])
+        
+    all_nodes = list(G.nodes())
+    filtered_nodes = [node for node in all_nodes if node!=(0,0) and node!=(0,1)]
+    selected_node_s = st.sidebar.multiselect("Introduce el nodo de semaforos que desea", filtered_nodes, default=[])
+    if selected_node_s:
+            for i in selected_node_s:
+                node_semaforo_status[i]= "semáforo"
+
+                arist=list(G.edges(i))
+                inicializar_grafo_con_aristas(G,arist)
+                st.session_state.node_semaforo_status=node_semaforo_status
+                st.session_state.arista_estado_generadores = inicializar_generadores_aristas(G)
+
+    filtered_nodes = [node for node in all_nodes if node not in selected_node_s]
+
+    selected_ceda_rows= st.sidebar.multiselect("Introduce el nodo de ceda el paso que desea para las avenidas", filtered_nodes, default=[])
+    if selected_ceda_rows:
+            for i in selected_ceda_rows:                
+                if i in st.session_state.node_semaforo_status:
+                    st.session_state.node_semaforo_status[i]== "ceda_el_paso(calle)"
+                    node_semaforo_status[i]= "ceda_el_paso"
+                    st.session_state.node_semaforo_status=node_semaforo_status
+                    continue
+                node_semaforo_status[i]= "ceda_el_paso(ave)"
+                st.session_state.node_semaforo_status=node_semaforo_status
+    selected_ceda_cols= st.sidebar.multiselect("Introduce el nodo de ceda el paso que desea para las calles", filtered_nodes, default=[(0,1)])
+    if selected_ceda_cols:
+            for i in selected_ceda_cols:
+                if i in st.session_state.node_semaforo_status:
+                    st.session_state.node_semaforo_status[i]== "ceda_el_paso(ave)"
+                    node_semaforo_status[i]= "ceda_el_paso"
+                    st.session_state.node_semaforo_status=node_semaforo_status
+                    continue
+                node_semaforo_status[i]= "ceda_el_paso(calle)"
+                st.session_state.node_semaforo_status=node_semaforo_status
+
+    filtered_nodes = [node for node in filtered_nodes if node not in selected_ceda_rows and node not in selected_ceda_cols ]
+    selected_stop= st.sidebar.multiselect("Introduce el nodo de pare que desea", filtered_nodes, default=[(0,0)])
+    if selected_stop:
+            for i in selected_stop:
+                node_semaforo_status[i]= "pare"
+                st.session_state.node_semaforo_status=node_semaforo_status
+
+    
+         #   st.seasion_state.edge_status=edge_status
+
+   
     fig = draw_graph(G, pos, edge_weights, edge_thickness,node_semaforo_status, centrality_value)
     graph_placeholder = st.empty()
     graph_placeholder.plotly_chart(fig)
@@ -592,7 +586,9 @@ def main():
     st.sidebar.subheader("Visualización del Recorrido")
     ready=st.sidebar.button("Inicializar Movimiento")      
     closed=st.sidebar.button("Detener Movimiento")
-
+    
+    estancamientos=[]
+            
     if ready or st.session_state.moving:
             if not st.session_state.moving:
                 st.session_state.moving=True
@@ -628,43 +624,52 @@ def main():
         'color': 'red' if i == 0 else f'rgba({random.randint(0,255)}, {random.randint(0,255)}, {random.randint(0,255)}, 1)'
     })
             st.session_state.moving_objects = moving_objects  # Guardar el nuevo estado
-            print(moving_objects)
-    # Mover los objetos (misma lógica que antes)
+            
             count=0
             stop={}
             vel={}
             vel_cols={}
-            vel_edges={}
             vel_edges_bool={}
+            visited_edges={}
+            cc=0
             while st.session_state.moving and not closed:
                 new_moving_objects = {}
-
+                
                 for edge, objects_on_edge in moving_objects.items():
                     k=[]
                     for obj in objects_on_edge:
-                        #print(st.session_state.nodos_fila)
+                        if obj['id'] not in visited_edges:
+                            visited_edges[obj['id']]=[]
+                            visited_edges[obj['id']].append({"count":1,"edge":edge})
+                        elif visited_edges[obj['id']][0]["edge"]==edge:
+                            counter=visited_edges[obj['id']][0]["count"]
+                            visited_edges[obj['id']][0]["count"]=counter+1
+                        else:
+                            visited_edges[obj['id']]=[{"count":1,"edge":edge}]
+                            
+                        if visited_edges[obj['id']][0]["count"]>=3 :
+                            
+                            if len(estancamientos)>=1:
+                                a=0
+                                for i in estancamientos:
+                                    if i[0]==obj['id'] and i[1]==edge:
+                                        estancamientos[estancamientos.index(i)][2]+=1
+                                        a+=1
+                                if a==0:
+                                    estancamientos.append([obj['id'],edge,visited_edges[obj['id']][0]["count"]])
+                            else:
+                                estancamientos.append([obj['id'],edge,visited_edges[obj['id']][0]["count"]])
+
+                        cc+=1
                         if not obj['id'] in vel:
                             vel[obj['id']]=True
                         
                         if not obj['id'] in vel_cols:
                             vel_cols[obj['id']]=True
-                        if grafo_tipo == 'Grid 2D Graph':
-                            
-                            if edge in st.session_state.nodos_fila:
-                                if vel[obj['id']]==False:
-                                    vel[obj['id']]=True
-                                elif vel[obj['id']]==True:
-                                    vel[obj['id']]=False
-                            #print(vel,st.session_state.nodos_fila,11111,edge)
-                            if edge in st.session_state.nodos_cols:
-                                if vel_cols[obj['id']]==False:
-                                    vel_cols[obj['id']]=True
-                                elif vel_cols[obj['id']]==True:
-                                    vel_cols[obj['id']]=False
+
                         if obj['id'] not in vel_edges_bool:
                             vel_edges_bool[obj['id']]=True                       
-                        if grafo_tipo =="N- Gird 2D Graph":
-                            if edge in selected_edges_vel:
+                        if edge in selected_edges_vel:
                                 if vel_edges_bool[obj['id']]==True:
                                     vel_edges_bool[obj['id']]=False
                                 elif vel_edges_bool[obj['id']]==False:
@@ -725,7 +730,6 @@ def main():
                             elif stop[obj['id']]==True:
                                 stop[obj['id']]=False
 
-                        #print(stop,obj['current_edge'])
                         if selected_node_s :
                                 closest_edge = get_random_closest_edge(G, obj['current_edge'][1], obj['previous_node'],edge,k,True,stop[obj['id']],vel[obj['id']],vel_cols[obj['id']],vel_edges_bool[obj['id']])
                         else:
@@ -755,8 +759,35 @@ def main():
                 count+=1
                 if count%3==0 and selected_node_s:
                     actualizar_estado_aristas() 
-    if closed:
+                if not "estancamientos" in st.session_state:
+                    st.session_state.estancamientos=estancamientos
+                elif estancamientos!=[]:
+                    for i in estancamientos:
+                        if i not in st.session_state.estancamientos:
+                            st.session_state.estancamientos.append(i)
+            if closed:
                 st.session_state.moving_objects={}
                 moving_objects={}
+                edges_stop=[]
+                count=0
+                if grafo_tipo in st.session_state.numbers_edge:
+                    st.write(f"La Red de Transporte se ha extendidio con un total de {len(st.session_state.numbers_edge[grafo_tipo])} caminos nuevos")
+                
+                for i in st.session_state.estancamientos:
+                    count+=1
+                    if i[1] not in edges_stop :
+                        edges_stop.append(i[1])
+                if st.session_state.estancamientos==[]:
+                    st.write("No han ocurrido estancamientos significativos del tráfico")
+                elif len(edges_stop)==1 :
+                    if count==1:
+                        st.write(f"Ha ocurrido {len(edges_stop)} estancamiento y se ha detenido {count} vehiculo")
+                    else:
+                        st.write(f"Ha ocurrido {len(edges_stop)} estancamiento y se han detenido {count} vehiculos")
+                       
+                else:
+                    st.write(f"Han ocurrido {len(edges_stop)} estancamientos y se han detenido {count} vehiculos")
+                st.session_state.estancamientos=[]
+                
 if __name__ =="__main__":
     main()
