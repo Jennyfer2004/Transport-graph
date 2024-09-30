@@ -36,7 +36,7 @@ def create_connected_grid_graphs(rows1, cols1, rows2, cols2, num_edges, row_devi
     
     return G,pos
 
-def draw_graph(G, pos, edge_weights, edge_thickness,node_semaforo_status={},centrality_value=None ,moving_objects=None):
+def draw_graph(G, pos, edge_weights, edge_thickness,node_semaforo_status={},centrality_value=None ,moving_objects=None,vel_edges_bool={}):
     edge_traces = []
     for edge in G.edges():
         x0, y0 = pos[edge[0]]
@@ -99,7 +99,6 @@ def draw_graph(G, pos, edge_weights, edge_thickness,node_semaforo_status={},cent
             color=node_color,
             colorbar=dict(
                 thickness=15,
-                title='Node Connections',
                 xanchor='left',
                 titleside='right'
             )
@@ -112,13 +111,17 @@ def draw_graph(G, pos, edge_weights, edge_thickness,node_semaforo_status={},cent
             x0, y0 = pos[edge[0]]
             x1, y1 = pos[edge[1]]
             num_objects = len(objects_on_edge)
-        
+            
             for i, obj in enumerate(objects_on_edge):
             # Colocar los objetos uno detrás de otro en la misma arista
-                ratio = (i + 1) / (num_objects + 1)  # Evitar solapamiento
+                ratio = (i + 1) / (num_objects + 1)  
                 obj_x = x0 * (1 - ratio) + x1 * ratio
                 obj_y = y0 * (1 - ratio) + y1 * ratio
-            
+                if obj['id'] in vel_edges_bool:
+                    if vel_edges_bool[(obj['id'],edge)]==False:
+                        print(obj_x,obj_y)
+                        obj_x=x0 * (1 - 0.1) + x1 * 0.1
+                        obj_y=y0 * (1 - 0.1) + y1 * 0.1
                 moving_object_trace = go.Scatter(
                     x=[obj_x],
                     y=[obj_y],
@@ -177,7 +180,7 @@ def gird_2d(rows, cols,calle,ave, weights=[2,4,6,8]):
         elif y0 == y1:  # Arista horizontal
             weight = weight_dict[y1 + rows]
         else:
-            weight = 1  # Peso por defecto para aristas diagonales (si se usan)
+            weight = 1  
             
         edge_weights[edge] = weight
         G[edge[0]][edge[1]]['weight'] = weight
@@ -258,7 +261,7 @@ def inicializar_generadores_aristas(G):
         edge: ciclo_arista() for edge in G.edges()
     }
 
-def generate_graph_witrh_weights(G,weights,pos):
+def generate_graph_witrh_weights(G,weights):
     edge_weights={}
     edge_thickness={}
 
@@ -290,7 +293,7 @@ def main():
 # Selección del tipo de grafo
 
     grafo_tipo = st.sidebar.selectbox(
-    'Selecciona el tipo de grafo para la red de transporte:',
+    'Selecciona el tipo de red de transporte que desee:',
     [ 'Grid 2D Graph',"Double Grid 2D Graph"]
 )
     
@@ -323,8 +326,8 @@ def main():
         )
 
 
-        rows = st.sidebar.number_input("Elija la cantidad de Calles", min_value=1, value=3)
-        cols = st.sidebar.number_input("Elija la cantidad de Avenidas", min_value=1, value=3)
+        rows = st.sidebar.number_input("Elija la cantidad de Calles", min_value=1, value=5)
+        cols = st.sidebar.number_input("Elija la cantidad de Avenidas", min_value=2, value=5)
 
         if "graph" not in st.session_state or (st.session_state.numbers != numbers or st.session_state.rows != rows or st.session_state.cols != cols or st.session_state.ave != ave or st.session_state.calle != calle) and grafo_tipo == 'Grid 2D Graph':
             G, pos, edge_weights, edge_thickness = gird_2d(rows, cols,calle,ave,numbers)
@@ -407,7 +410,7 @@ def main():
             st.session_state.graph = G
             st.session_state.pos = pos
             st.session_state.numbers=numbers
-            edge_weights,edge_thickness = generate_graph_witrh_weights(G,numbers,pos)
+            edge_weights,edge_thickness = generate_graph_witrh_weights(G,numbers)
             st.session_state.edge_weights = edge_weights
             st.session_state.edge_thickness = edge_thickness
 
@@ -420,13 +423,13 @@ def main():
         num_objects = st.sidebar.number_input("Elija la cantidad de Objetos en Movimiento", min_value=1, value=3)
      
     st.sidebar.subheader("Añadir una arista")
-    nodes = list(G.nodes())
+    nodes = sorted(list(G.nodes()))
 
 # Seleccionar dos nodos para crear una nueva arista
-    node1 = st.sidebar.selectbox("Selecciona el primer nodo:", nodes)
-    node2 = st.sidebar.selectbox("Selecciona el segundo nodo:", nodes)
+    node1 = st.sidebar.selectbox("Selecciona la primera intersección:", nodes)
+    node2 = st.sidebar.selectbox("Selecciona la segunda intersección:", nodes)
     peso = st.sidebar.text_area(
-        "Escribe el peso",
+        "Escribe el grosor que tendrá ",
         value=str(2),
         placeholder="Presiona Enter después de ingresar", height=1)
     
@@ -435,10 +438,16 @@ def main():
         if G.has_edge(node1, node2):
             st.warning(f"La arista entre {node1} y {node2} ya existe")
         else:
-            G.add_edge(node1, node2)
-            edge_weights[(node1, node2)] = float(peso)
-            edge_thickness[(node1, node2)] = float(peso) 
-            
+            try:
+                G.add_edge(node1, node2)
+                edge_weights[(node1, node2)] = float(peso)
+                edge_thickness[(node1, node2)] = float(peso) 
+            except:
+                G.add_edge(node2, node1)
+                edge_weights[(node2, node1)] = float(peso)
+                edge_thickness[(node2, node1)] = float(peso) 
+        for i in edge_thickness:
+            print(type(edge_thickness[i]))
     st.sidebar.subheader("Eliminación de aristas")
     edges = list(G.edges())
     selected_edge = st.sidebar.selectbox("Selecciona una arista para eliminar:", edges, format_func=lambda e: f"{e[0]}-{e[1]}")
@@ -453,11 +462,11 @@ def main():
                 st.error(f"Arista {selected_edge} no encontrada")
 
         # Opción para eliminar nodos
-    st.sidebar.subheader("Eliminación de Nodos")
-    nodes = list(G.nodes())
-    selected_node = st.sidebar.selectbox("Selecciona un nodo para eliminar:", nodes)
+    st.sidebar.subheader("Eliminación de Intersecciones")
+    nodes = sorted(list(G.nodes()))
+    selected_node = st.sidebar.selectbox("Selecciona una intersección para eliminar:", nodes)
 
-    if st.sidebar.button("Eliminar Nodos"):
+    if st.sidebar.button("Eliminar Intersección"):
             if selected_node in G.nodes():
                 G.remove_node(selected_node)
                 if grafo_tipo == 'Grid 2D Graph':
@@ -468,23 +477,15 @@ def main():
                 pos={node:pos[node] for node in G.nodes()}
                 st.session_state.pos=pos
             else:
-                st.error(f"Nodo {selected_node} no encontrado")
+                st.error(f"Intersección {selected_node} no encontrado")
 
-
-    st.sidebar.subheader("Opciones de centralidad")
-    centrality_option = st.sidebar.selectbox("Selecciona el tipo de centralidad que desea visualizar :", ["Ninguna","Degree Centrality","Minimo Cenected Time","Betweenness Centrality","Closeness Centrality","Eigenvector Centrality"])
-
-    if centrality_option:
-        centrality_value =calculate_centrality(G,centrality_option)
-    elif centrality_option=="Ninguna":
-        centrality_value =None
     
     def actualizar_estado_aristas():
             update_estado_aristas(G, st.session_state.arista_estado_generadores)
             
     st.sidebar.subheader("Opción de expansión")
-    n = st.sidebar.slider('Seleccione cuantas veces lo desea', value=0)
-    expansion_probability = st.sidebar.slider('Seleccione cuantas veces lo desea', value=0.3 )
+    n = st.sidebar.slider('Seleccione cuantas veces desea que se expanda' , value=0)
+    expansion_probability = st.sidebar.slider('Seleccione lo probabilidad de que aparezcan caminos nuevos', value=0.3 )
    
     if not "n" in st.session_state:
         st.session_state.n=n
@@ -527,14 +528,22 @@ def main():
                     edge_thickness[edge]=random.choice([2, 4])
         st.session_state.graph=G
        
+    st.sidebar.subheader("Opciones de centralidad")
+    centrality_option = st.sidebar.selectbox("Selecciona el tipo de centralidad que desea visualizar :", ["Ninguna","Degree Centrality","Minimo Cenected Time","Betweenness Centrality","Closeness Centrality","Eigenvector Centrality"])
+
+    if centrality_option:
+        centrality_value =calculate_centrality(G,centrality_option)
+    elif centrality_option=="Ninguna":
+        centrality_value =None
+
     st.sidebar.subheader("Opciones de señales de transito") 
 
     all_edges = list(G.edges())
     selected_edges_vel = st.sidebar.multiselect("Introduce los tramos de reducción de velocidad que desea", all_edges, default=[])
         
-    all_nodes = list(G.nodes())
+    all_nodes =sorted(list(G.nodes()))
     filtered_nodes = [node for node in all_nodes if node!=(0,0) and node!=(0,1)]
-    selected_node_s = st.sidebar.multiselect("Introduce el nodo de semaforos que desea", filtered_nodes, default=[])
+    selected_node_s = st.sidebar.multiselect("Introduce la intersección de semaforos que desee", filtered_nodes, default=[])
     if selected_node_s:
             for i in selected_node_s:
                 node_semaforo_status[i]= "semáforo"
@@ -546,7 +555,7 @@ def main():
 
     filtered_nodes = [node for node in all_nodes if node not in selected_node_s]
 
-    selected_ceda_rows= st.sidebar.multiselect("Introduce el nodo de ceda el paso que desea para las avenidas", filtered_nodes, default=[])
+    selected_ceda_rows= st.sidebar.multiselect("Introduce la intersección de ceda el paso que desea para las avenidas", filtered_nodes, default=[])
     if selected_ceda_rows:
             for i in selected_ceda_rows:                
                 if i in st.session_state.node_semaforo_status:
@@ -556,7 +565,7 @@ def main():
                     continue
                 node_semaforo_status[i]= "ceda_el_paso(ave)"
                 st.session_state.node_semaforo_status=node_semaforo_status
-    selected_ceda_cols= st.sidebar.multiselect("Introduce el nodo de ceda el paso que desea para las calles", filtered_nodes, default=[(0,1)])
+    selected_ceda_cols= st.sidebar.multiselect("Introduce la intersección de ceda el paso que desea para las calles", filtered_nodes, default=[(0,1)])
     if selected_ceda_cols:
             for i in selected_ceda_cols:
                 if i in st.session_state.node_semaforo_status:
@@ -568,7 +577,7 @@ def main():
                 st.session_state.node_semaforo_status=node_semaforo_status
 
     filtered_nodes = [node for node in filtered_nodes if node not in selected_ceda_rows and node not in selected_ceda_cols ]
-    selected_stop= st.sidebar.multiselect("Introduce el nodo de pare que desea", filtered_nodes, default=[(0,0)])
+    selected_stop= st.sidebar.multiselect("Introduce la intersección de pare que desea", filtered_nodes, default=[(0,0)])
     if selected_stop:
             for i in selected_stop:
                 node_semaforo_status[i]= "pare"
@@ -586,10 +595,16 @@ def main():
     st.sidebar.subheader("Visualización del Recorrido")
     ready=st.sidebar.button("Inicializar Movimiento")      
     closed=st.sidebar.button("Detener Movimiento")
+
     
     estancamientos=[]
             
     if ready or st.session_state.moving:
+            if "closed" not in st.session_state:
+                st.session_state.closed=True
+            else:
+                st.session_state.closed=True
+
             if not st.session_state.moving:
                 st.session_state.moving=True
             if "moving_objects" not in st.session_state:
@@ -599,9 +614,8 @@ def main():
             current_num_objects = sum(len(objects) for objects in moving_objects.values())  # Total de objetos actuales
             if current_num_objects > num_objects:
                 all_objects = [(edge, obj) for edge, objects_on_edge in moving_objects.items() for obj in objects_on_edge]
-    
-    # Ordenarlos por el 'id' o de alguna manera lógica, por ejemplo
-                all_objects.sort(key=lambda x: x[1]['id'])  # Ordenar por ID de objeto (puedes cambiar esto si es necesario)
+                 
+                all_objects.sort(key=lambda x: x[1]['id']) 
     
     # Eliminar los objetos excedentes
                 for _ in range(current_num_objects - num_objects):
@@ -632,7 +646,7 @@ def main():
             vel_edges_bool={}
             visited_edges={}
             cc=0
-            while st.session_state.moving and not closed:
+            while st.session_state.moving and not closed and st.session_state.closed:
                 new_moving_objects = {}
                 
                 for edge, objects_on_edge in moving_objects.items():
@@ -660,22 +674,22 @@ def main():
                             else:
                                 estancamientos.append([obj['id'],edge,visited_edges[obj['id']][0]["count"]])
 
-                        cc+=1
                         if not obj['id'] in vel:
                             vel[obj['id']]=True
                         
                         if not obj['id'] in vel_cols:
                             vel_cols[obj['id']]=True
 
-                        if obj['id'] not in vel_edges_bool:
-                            vel_edges_bool[obj['id']]=True                       
+                        if (obj['id'],edge) not in vel_edges_bool:
+                            vel_edges_bool[(obj['id'],edge)]=True                       
                         if edge in selected_edges_vel:
-                                if vel_edges_bool[obj['id']]==True:
-                                    vel_edges_bool[obj['id']]=False
-                                elif vel_edges_bool[obj['id']]==False:
-                                    vel_edges_bool[obj['id']]=True
+                                if vel_edges_bool[(obj['id'],edge)]==True:
+                                    vel_edges_bool[(obj['id'],edge)]=False
+                                elif vel_edges_bool[(obj['id'],edge)]==False:
+                                    vel_edges_bool[(obj['id'],edge)]=True
+                        
                         if edge[1] in node_semaforo_status:
-                            if node_semaforo_status[edge[1]]=="ceda_el_paso(ave)":
+                            if node_semaforo_status[edge[1]]=="ceda_el_paso(ave)" and vel_edges_bool[(obj['id'],edge)]:
                                 adjacent_edges = [(u, v) for u, v in G.edges(edge[1]) if u[1] == i and v[1] == i]
                                 for i in adjacent_edges:
                                     j=i[1]
@@ -690,7 +704,7 @@ def main():
                                         else:
                                             if i in moving_objects and moving_objects[i]:
                                                k.append(i)
-                            elif node_semaforo_status[edge[1]]=="ceda_el_paso":
+                            elif node_semaforo_status[edge[1]]=="ceda_el_paso" and vel_edges_bool[(obj['id'],edge)]:
                                 adjacent_edges = list(G.edges(edge[1]))
                                 for i in adjacent_edges:
                                     j=i[1]
@@ -705,7 +719,7 @@ def main():
                                         else:
                                             if i in moving_objects and moving_objects[i]:
                                                k.append(i)
-                            elif node_semaforo_status[edge[1]]=="ceda_el_paso(calle)":
+                            elif node_semaforo_status[edge[1]]=="ceda_el_paso(calle)" and vel_edges_bool[(obj['id'],edge)]:
                                 adjacent_edges = [(u, v) for u, v in G.edges(edge[1]) if u[0] == i and v[0] == i]
                      
                                 for i in adjacent_edges:
@@ -721,19 +735,20 @@ def main():
                                         else:
                                             if i in moving_objects and moving_objects[i]:
                                                k.append(i)
-                                
+                        print(moving_objects)
+                        print()
                         if not obj['id'] in stop:
                              stop[obj['id']]=True
-                        if selected_stop and edge[1] in node_semaforo_status and node_semaforo_status[edge[1]]=="pare":
+                        if selected_stop and edge[1] in node_semaforo_status and node_semaforo_status[edge[1]]=="pare" and vel_edges_bool[(obj['id'],edge)]:
                             if stop[obj['id']]==False:
                                 stop[obj['id']]=True
                             elif stop[obj['id']]==True:
                                 stop[obj['id']]=False
 
                         if selected_node_s :
-                                closest_edge = get_random_closest_edge(G, obj['current_edge'][1], obj['previous_node'],edge,k,True,stop[obj['id']],vel[obj['id']],vel_cols[obj['id']],vel_edges_bool[obj['id']])
+                                closest_edge = get_random_closest_edge(G, obj['current_edge'][1], obj['previous_node'],edge,k,True,stop[obj['id']],vel[obj['id']],vel_cols[obj['id']],vel_edges_bool[(obj['id'],edge)])
                         else:
-                                closest_edge = get_random_closest_edge(G, obj['current_edge'][1], obj['previous_node'],edge,k,False,stop[obj['id']],vel[obj['id']],vel_cols[obj['id']],vel_edges_bool[obj['id']])
+                                closest_edge = get_random_closest_edge(G, obj['current_edge'][1], obj['previous_node'],edge,k,False,stop[obj['id']],vel[obj['id']],vel_cols[obj['id']],vel_edges_bool[(obj['id'],edge)])
                         
                         if closest_edge==obj['current_edge'] :
                             if closest_edge not in new_moving_objects:
@@ -751,7 +766,7 @@ def main():
 
                 moving_objects = new_moving_objects
         # Actualizar el grafo
-                fig = draw_graph(G, pos, edge_weights, edge_thickness,node_semaforo_status, centrality_value, moving_objects)
+                fig = draw_graph(G, pos, edge_weights, edge_thickness,node_semaforo_status, centrality_value, moving_objects,vel_edges_bool)
                 graph_placeholder.plotly_chart(fig)
 
         # Esperar un momento antes de la siguiente actualización
@@ -766,6 +781,8 @@ def main():
                         if i not in st.session_state.estancamientos:
                             st.session_state.estancamientos.append(i)
             if closed:
+                if "closed" not in st.session_state:
+                    st.session_state.closed=False
                 st.session_state.moving_objects={}
                 moving_objects={}
                 edges_stop=[]

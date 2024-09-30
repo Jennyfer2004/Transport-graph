@@ -25,7 +25,7 @@ selection = st.sidebar.radio('Selecciona una opción:', opciones)
 
 
 if selection == "Red Interactiva":
-    with open("grafo.py", encoding="UTF-8") as f:
+    with open("union_1.py", encoding="UTF-8") as f:
         exec(f.read())
 else:
     main()
